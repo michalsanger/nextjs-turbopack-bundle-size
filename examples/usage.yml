@@ -1,0 +1,31 @@
+name: "Next.js Bundle Analysis"
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  analyze-bundle:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - run: npm ci
+
+      - run: TURBOPACK_STATS=1 npm run build
+
+      - uses: michalsanger/nextjs-turbopack-bundle-size@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
