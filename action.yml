@@ -45,108 +45,22 @@ runs:
       uses: actions/github-script@v8.0.0
       env:
         STATS_PATH: ${{ inputs.stats-path }}
+        ACTION_PATH: ${{ github.action_path }}
       with:
         script: |
-          const fs = require("fs");
-          const path = require("path");
-          const zlib = require("zlib");
+          const path = require('path');
+          const fs = require('fs');
+          const { parseStatsFile, generateReport } = require(
+            path.join(process.env.ACTION_PATH, 'src', 'parse-stats.js')
+          );
 
-          const statsPath = process.env.STATS_PATH;
-
-          const formatBytes = (bytes) => {
-            if (bytes === 0) return "0 B";
-            const k = 1024;
-            const sizes = ["B", "KB", "MB"];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-          };
-
-          const formatDiff = (current, baseline) => {
-            if (baseline === undefined) return "🆕 New";
-            const diff = current - baseline;
-            if (diff === 0) return "➖ No change";
-            const sign = diff > 0 ? "🔴 +" : "🟢 ";
-            return `${sign}${formatBytes(Math.abs(diff))}`;
-          };
-
-          const parseStats = (statsPath, calculateGzip) => {
-            if (!fs.existsSync(statsPath)) return {};
-            const stats = JSON.parse(fs.readFileSync(statsPath, "utf8"));
-            const assetSizes = {};
-            (stats.assets || []).forEach((a) => {
-              assetSizes[a.name] = a.size;
-            });
-
-            const entrypoints = stats.namedChunkGroups || stats.entrypoints || {};
-            const routes = {};
-
-            for (const [routeName, chunkGroup] of Object.entries(entrypoints)) {
-              const internal = [
-                "webpack",
-                "main-app",
-                "main",
-                "polyfills",
-                "react-refresh",
-                "edge-wrapper",
-              ];
-              if (internal.some((i) => routeName.includes(i))) continue;
-
-              let totalRaw = 0;
-              let totalGzip = 0;
-
-              (chunkGroup.assets || []).forEach((asset) => {
-                const assetName = typeof asset === "string" ? asset : asset.name;
-                if (assetName.endsWith(".js")) {
-                  totalRaw += assetSizes[assetName] || 0;
-
-                  if (calculateGzip) {
-                    let filePath = assetName;
-                    if (!fs.existsSync(filePath) && !filePath.startsWith(".next")) {
-                      filePath = path.join(".next", assetName);
-                    }
-                    if (fs.existsSync(filePath)) {
-                      const fileBuffer = fs.readFileSync(filePath);
-                      totalGzip += zlib.gzipSync(fileBuffer).length;
-                    } else {
-                      console.log(`⚠️ Warning: Could not find file on disk for gzip: ${filePath}`);
-                    }
-                  }
-                }
-              });
-
-              if (totalRaw > 0) {
-                let cleanRoute = routeName.replace(/^app/, "").replace(/\/page$/, "");
-                cleanRoute = cleanRoute === "" ? "/" : cleanRoute;
-                routes[cleanRoute] = { raw: totalRaw, gzip: totalGzip };
-              }
-            }
-            return routes;
-          };
-
-          const currentRoutes = parseStats(statsPath, true);
-          const baselineRoutes = parseStats(
-            path.join("_bundle-baseline-stats", "webpack-stats.json"),
+          const currentRoutes = parseStatsFile(process.env.STATS_PATH, true);
+          const baselineRoutes = parseStatsFile(
+            path.join('_bundle-baseline-stats', 'webpack-stats.json'),
             false,
           );
 
-          let markdown = "### 📦 Next.js App Router Sizes (Turbopack)\n\n";
-          markdown += "| Route | Uncompressed | Gzipped | Diff (vs main) |\n|---|---|---|---|\n";
-
-          let foundRoutes = false;
-          for (const [route, sizes] of Object.entries(currentRoutes)) {
-            foundRoutes = true;
-            const baselineSize = baselineRoutes[route]
-              ? baselineRoutes[route].raw
-              : undefined;
-            const diffStr = formatDiff(sizes.raw, baselineSize);
-            markdown += `| \`${route}\` | ${formatBytes(sizes.raw)} | **${formatBytes(sizes.gzip)}** | ${diffStr} |\n`;
-          }
-
-          if (!foundRoutes) {
-            markdown += "> ⚠️ **Warning:** No routes identified. Ensure `TURBOPACK_STATS=1` is set during build.\n";
-          }
-
-          fs.writeFileSync("bundle-report.md", markdown);
+          fs.writeFileSync('bundle-report.md', generateReport(currentRoutes, baselineRoutes));
 
     - name: Post or update PR comment
       if: github.event_name == 'pull_request'

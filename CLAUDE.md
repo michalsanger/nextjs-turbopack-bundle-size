@@ -12,9 +12,17 @@ A GitHub **Composite Action** that tracks Next.js App Router bundle sizes across
     github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+## Commands
+
+```bash
+npm test   # run unit tests (no install needed — uses Node built-in test runner)
+```
+
 ## File Structure
 
 - `action.yml` — the action definition (root is required by GitHub)
+- `src/parse-stats.js` — all parsing, formatting, and report generation logic
+- `src/parse-stats.test.js` — unit tests for the above
 - `examples/usage.yml` — a complete example workflow for consuming repos
 - `README.md` — usage docs including inputs and permissions
 
@@ -34,14 +42,16 @@ The `if:` conditions on composite action steps use the **caller's** event contex
 
 ## Stats Parsing Logic
 
-The inline JS in the `github-script` step:
+All logic lives in `src/parse-stats.js` and is loaded by the `github-script` step via `require(path.join(process.env.ACTION_PATH, 'src', 'parse-stats.js'))`. `ACTION_PATH` is set via `env:` because `github.action_path` is only available as an expression, not a runtime env variable.
 
-- Reads `stats.namedChunkGroups` (falling back to `stats.entrypoints`) for route entrypoints
-- Filters out internal chunks: `webpack`, `main-app`, `main`, `polyfills`, `react-refresh`, `edge-wrapper`
-- Sums `.js` assets only per route
-- Gzip-calculates current build by reading files from disk with `zlib.gzipSync`; baseline only needs raw sizes
-- Normalizes route names: strips `app` prefix and `/page` suffix; empty string → `/`
-- Writes `bundle-report.md` to workspace root, picked up by the comment step
+Exported functions:
+
+- `processStats(stats, getGzipSize?)` — pure function; takes a parsed stats object and an optional gzip-size callback; returns a routes map. Filters internal chunks, sums `.js` assets only, normalizes route names (strips `app` prefix and `/page` suffix; empty string → `/`).
+- `parseStatsFile(statsPath, calculateGzip)` — I/O wrapper; reads JSON from disk, builds the `getGzipSize` callback using `zlib.gzipSync`, delegates to `processStats`.
+- `generateReport(currentRoutes, baselineRoutes)` — pure function; builds the markdown table string.
+- `formatBytes(bytes)` / `formatDiff(current, baseline)` — pure formatting helpers.
+
+The `processStats`/`parseStatsFile` split keeps I/O at the boundary and makes the core logic testable without touching the filesystem.
 
 The baseline stats are downloaded to `_bundle-baseline-stats/` in the workspace.
 
