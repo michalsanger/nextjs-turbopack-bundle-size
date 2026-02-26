@@ -35,7 +35,7 @@ function formatDiff(current, baseline) {
  * @param {object} stats - Parsed webpack-stats.json content
  * @param {((assetName: string) => number) | null} getGzipSize - Optional
  *   callback returning the gzip size for an asset path. Return 0 if not found.
- * @returns {Record<string, { raw: number, gzip: number }>}
+ * @returns {Record<string, { gzip: number }>}
  */
 function processStats(stats, getGzipSize = null) {
   const assetSizes = {};
@@ -64,7 +64,7 @@ function processStats(stats, getGzipSize = null) {
 
     let cleanRoute = routeName.replace(/^app/, '').replace(/\/page$/, '');
     cleanRoute = cleanRoute === '' ? '/' : cleanRoute;
-    routes[cleanRoute] = { raw: totalRaw, gzip: totalGzip };
+    routes[cleanRoute] = { gzip: totalGzip };
   }
 
   return routes;
@@ -75,7 +75,7 @@ function processStats(stats, getGzipSize = null) {
  *
  * @param {string} statsPath
  * @param {boolean} calculateGzip
- * @returns {Record<string, { raw: number, gzip: number }>}
+ * @returns {Record<string, { gzip: number }>}
  */
 function parseStatsFile(statsPath, calculateGzip) {
   if (!fs.existsSync(statsPath)) return {};
@@ -101,19 +101,19 @@ function parseStatsFile(statsPath, calculateGzip) {
 /**
  * Generates a markdown report comparing current routes to a baseline.
  *
- * @param {Record<string, { raw: number, gzip: number }>} currentRoutes
- * @param {Record<string, { raw: number, gzip: number }>} baselineRoutes
+ * @param {Record<string, { gzip: number }>} currentRoutes
+ * @param {Record<string, { gzip: number }>} baselineRoutes
  * @returns {string}
  */
 function generateReport(currentRoutes, baselineRoutes) {
   let markdown = '### 📦 Next.js App Router Sizes (Turbopack)\n\n';
-  markdown += '| Route | Uncompressed | Gzipped | Diff (vs main) |\n|---|---|---|---|\n';
+  markdown += '| Route | Size (gzipped) | Diff (vs main) |\n|---|---|---|\n';
 
   let foundRoutes = false;
   for (const [route, sizes] of Object.entries(currentRoutes)) {
     foundRoutes = true;
-    const baselineSize = baselineRoutes[route]?.raw;
-    markdown += `| \`${route}\` | ${formatBytes(sizes.raw)} | **${formatBytes(sizes.gzip)}** | ${formatDiff(sizes.raw, baselineSize)} |\n`;
+    const baselineSize = baselineRoutes[route]?.gzip;
+    markdown += `| \`${route}\` | **${formatBytes(sizes.gzip)}** | ${formatDiff(sizes.gzip, baselineSize)} |\n`;
   }
 
   if (!foundRoutes) {

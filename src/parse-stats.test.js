@@ -99,7 +99,6 @@ describe('processStats', () => {
     );
     const routes = processStats(stats);
     assert.ok('/about' in routes, 'expected /about route');
-    assert.equal(routes['/about'].raw, 2048);
   });
 
   test('maps root route to "/"', () => {
@@ -116,7 +115,7 @@ describe('processStats', () => {
       { 'app/blog/page': { assets: [{ name: 'a.js' }, { name: 'b.js' }] } },
       [{ name: 'a.js', size: 1000 }, { name: 'b.js', size: 500 }],
     );
-    assert.equal(processStats(stats)['/blog'].raw, 1500);
+    assert.equal(processStats(stats, () => 100)['/blog'].gzip, 200);
   });
 
   test('calls getGzipSize for each JS asset and accumulates result', () => {
@@ -154,7 +153,7 @@ describe('processStats', () => {
       [{ name: 'home.js', size: 1024 }],
     );
     const routes = processStats(stats);
-    assert.equal(routes['/'].raw, 1024);
+    assert.ok('/' in routes);
   });
 });
 
@@ -164,9 +163,9 @@ describe('processStats', () => {
 
 describe('generateReport', () => {
   test('includes header rows', () => {
-    const report = generateReport({ '/': { raw: 1024, gzip: 512 } }, {});
+    const report = generateReport({ '/': { gzip: 512 } }, {});
     assert.ok(report.includes('### 📦 Next.js App Router Sizes (Turbopack)'));
-    assert.ok(report.includes('| Route | Uncompressed | Gzipped | Diff (vs main) |'));
+    assert.ok(report.includes('| Route | Size (gzipped) | Diff (vs main) |'));
   });
 
   test('shows warning when no routes', () => {
@@ -175,19 +174,19 @@ describe('generateReport', () => {
   });
 
   test('shows New for routes missing from baseline', () => {
-    const report = generateReport({ '/': { raw: 1024, gzip: 512 } }, {});
+    const report = generateReport({ '/': { gzip: 512 } }, {});
     assert.ok(report.includes('🆕 New'));
   });
 
   test('shows diff against baseline', () => {
-    const current = { '/': { raw: 2048, gzip: 1024 } };
-    const baseline = { '/': { raw: 1024, gzip: 512 } };
+    const current = { '/': { gzip: 1024 } };
+    const baseline = { '/': { gzip: 512 } };
     const report = generateReport(current, baseline);
     assert.ok(report.includes('🔴 +'));
   });
 
   test('shows gzip size in bold', () => {
-    const report = generateReport({ '/about': { raw: 2048, gzip: 1024 } }, {});
+    const report = generateReport({ '/about': { gzip: 1024 } }, {});
     assert.ok(report.includes('**1 KB**'));
   });
 });
