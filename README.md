@@ -6,7 +6,7 @@ A GitHub Action that tracks Next.js App Router bundle sizes across pull requests
 
 ```yaml
 - name: Analyze bundle sizes
-  uses: michalsanger/nextjs-turbopack-bundle-size@v1
+  uses: michalsanger/nextjs-turbopack-bundle-size@v2
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
