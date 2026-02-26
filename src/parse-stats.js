@@ -103,11 +103,10 @@ function parseStatsFile(statsPath, calculateGzip) {
  *
  * @param {Record<string, { gzip: number }>} currentRoutes
  * @param {Record<string, { gzip: number }>} baselineRoutes
- * @param {{ minimumChangeThreshold?: number }} config
+ * @param {number} threshold
  * @returns {string}
  */
-function generateReport(currentRoutes, baselineRoutes, config = {}) {
-  const threshold = config.minimumChangeThreshold ?? 0;
+function generateReport(currentRoutes, baselineRoutes, threshold = 0) {
   let markdown = '### 📦 Next.js App Router Sizes (Turbopack)\n\n';
   markdown += '| Route | Size (gzipped) | Diff (vs main) |\n|---|---|---|\n';
 
@@ -126,16 +125,4 @@ function generateReport(currentRoutes, baselineRoutes, config = {}) {
   return markdown;
 }
 
-/**
- * Reads the nextBundleAnalysis config from the nearest package.json.
- *
- * @param {string} packageJsonPath
- * @returns {{ minimumChangeThreshold?: number }}
- */
-function loadConfig(packageJsonPath = 'package.json') {
-  if (!fs.existsSync(packageJsonPath)) return {};
-  const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-  return pkg.nextBundleAnalysis || {};
-}
-
-module.exports = { formatBytes, formatDiff, processStats, parseStatsFile, generateReport, loadConfig };
+module.exports = { formatBytes, formatDiff, processStats, parseStatsFile, generateReport };

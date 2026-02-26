@@ -18,6 +18,10 @@ inputs:
     description: 'Artifact name used to store and retrieve the baseline stats from the main branch'
     required: false
     default: 'turbopack-main-stats'
+  minimum-change-threshold:
+    description: 'Byte threshold below which a size change is considered unchanged'
+    required: false
+    default: '0'
 
 runs:
   using: composite
@@ -46,22 +50,23 @@ runs:
       env:
         STATS_PATH: ${{ inputs.stats-path }}
         ACTION_PATH: ${{ github.action_path }}
+        MINIMUM_CHANGE_THRESHOLD: ${{ inputs.minimum-change-threshold }}
       with:
         script: |
           const path = require('path');
           const fs = require('fs');
-          const { parseStatsFile, generateReport, loadConfig } = require(
+          const { parseStatsFile, generateReport } = require(
             path.join(process.env.ACTION_PATH, 'src', 'parse-stats.js')
           );
 
-          const config = loadConfig('package.json');
+          const threshold = parseInt(process.env.MINIMUM_CHANGE_THRESHOLD) || 0;
           const currentRoutes = parseStatsFile(process.env.STATS_PATH, true);
           const baselineRoutes = parseStatsFile(
             path.join('_bundle-baseline-stats', 'webpack-stats.json'),
             false,
           );
 
-          fs.writeFileSync('bundle-report.md', generateReport(currentRoutes, baselineRoutes, config));
+          fs.writeFileSync('bundle-report.md', generateReport(currentRoutes, baselineRoutes, threshold));
 
     - name: Post or update PR comment
       if: github.event_name == 'pull_request'

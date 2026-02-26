@@ -2,10 +2,7 @@
 
 const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
-const os = require('os');
-const fs = require('fs');
-const path = require('path');
-const { formatBytes, formatDiff, processStats, generateReport, loadConfig } = require('./parse-stats.js');
+const { formatBytes, formatDiff, processStats, generateReport } = require('./parse-stats.js');
 
 // ---------------------------------------------------------------------------
 // formatBytes
@@ -205,41 +202,17 @@ describe('generateReport', () => {
     assert.ok(report.includes('**1 KB**'));
   });
 
-  test('treats change below minimumChangeThreshold as no change', () => {
+  test('treats change below threshold as no change', () => {
     const current = { '/': { gzip: 1300 } };
     const baseline = { '/': { gzip: 1000 } };
-    const report = generateReport(current, baseline, { minimumChangeThreshold: 500 });
+    const report = generateReport(current, baseline, 500);
     assert.ok(report.includes('➖ No change'));
   });
 
-  test('shows diff when change exceeds minimumChangeThreshold', () => {
+  test('shows diff when change exceeds threshold', () => {
     const current = { '/': { gzip: 1600 } };
     const baseline = { '/': { gzip: 1000 } };
-    const report = generateReport(current, baseline, { minimumChangeThreshold: 500 });
+    const report = generateReport(current, baseline, 500);
     assert.ok(report.includes('🔴 +'));
-  });
-});
-
-// ---------------------------------------------------------------------------
-// loadConfig
-// ---------------------------------------------------------------------------
-
-describe('loadConfig', () => {
-  test('returns empty object when package.json does not exist', () => {
-    assert.deepEqual(loadConfig('/nonexistent/package.json'), {});
-  });
-
-  test('returns empty object when nextBundleAnalysis key is absent', () => {
-    const tmp = path.join(os.tmpdir(), 'pkg-no-key.json');
-    fs.writeFileSync(tmp, JSON.stringify({ name: 'my-app' }));
-    assert.deepEqual(loadConfig(tmp), {});
-    fs.unlinkSync(tmp);
-  });
-
-  test('returns nextBundleAnalysis config', () => {
-    const tmp = path.join(os.tmpdir(), 'pkg-with-config.json');
-    fs.writeFileSync(tmp, JSON.stringify({ nextBundleAnalysis: { minimumChangeThreshold: 500 } }));
-    assert.deepEqual(loadConfig(tmp), { minimumChangeThreshold: 500 });
-    fs.unlinkSync(tmp);
   });
 });
