@@ -50,17 +50,18 @@ runs:
         script: |
           const path = require('path');
           const fs = require('fs');
-          const { parseStatsFile, generateReport } = require(
+          const { parseStatsFile, generateReport, loadConfig } = require(
             path.join(process.env.ACTION_PATH, 'src', 'parse-stats.js')
           );
 
+          const config = loadConfig('package.json');
           const currentRoutes = parseStatsFile(process.env.STATS_PATH, true);
           const baselineRoutes = parseStatsFile(
             path.join('_bundle-baseline-stats', 'webpack-stats.json'),
             false,
           );
 
-          fs.writeFileSync('bundle-report.md', generateReport(currentRoutes, baselineRoutes));
+          fs.writeFileSync('bundle-report.md', generateReport(currentRoutes, baselineRoutes, config));
 
     - name: Post or update PR comment
       if: github.event_name == 'pull_request'

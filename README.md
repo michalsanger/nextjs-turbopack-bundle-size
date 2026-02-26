@@ -21,6 +21,22 @@ The action must run **after** the app has been built with `TURBOPACK_STATS=1`. S
 | `stats-path` | No | `.next/server/webpack-stats.json` | Path to the Turbopack stats file |
 | `artifact-name` | No | `turbopack-main-stats` | Artifact name for storing the baseline stats |
 
+## Configuration
+
+You can configure the action by adding a `nextBundleAnalysis` key to your `package.json`:
+
+```json
+{
+  "nextBundleAnalysis": {
+    "minimumChangeThreshold": 500
+  }
+}
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `minimumChangeThreshold` | `0` | Byte threshold below which a size change is considered unchanged. For example, `500` means changes of 500 B or less are shown as "➖ No change". |
+
 ## Required Permissions
 
 ```yaml

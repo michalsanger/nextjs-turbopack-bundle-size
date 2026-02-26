@@ -21,10 +21,10 @@ function formatBytes(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-function formatDiff(current, baseline) {
+function formatDiff(current, baseline, threshold = 0) {
   if (baseline === undefined) return '🆕 New';
   const diff = current - baseline;
-  if (diff === 0) return '➖ No change';
+  if (Math.abs(diff) <= threshold) return '➖ No change';
   const sign = diff > 0 ? '🔴 +' : '🟢 ';
   return `${sign}${formatBytes(Math.abs(diff))}`;
 }
@@ -103,9 +103,11 @@ function parseStatsFile(statsPath, calculateGzip) {
  *
  * @param {Record<string, { gzip: number }>} currentRoutes
  * @param {Record<string, { gzip: number }>} baselineRoutes
+ * @param {{ minimumChangeThreshold?: number }} config
  * @returns {string}
  */
-function generateReport(currentRoutes, baselineRoutes) {
+function generateReport(currentRoutes, baselineRoutes, config = {}) {
+  const threshold = config.minimumChangeThreshold ?? 0;
   let markdown = '### 📦 Next.js App Router Sizes (Turbopack)\n\n';
   markdown += '| Route | Size (gzipped) | Diff (vs main) |\n|---|---|---|\n';
 
@@ -113,7 +115,7 @@ function generateReport(currentRoutes, baselineRoutes) {
   for (const [route, sizes] of Object.entries(currentRoutes)) {
     foundRoutes = true;
     const baselineSize = baselineRoutes[route]?.gzip;
-    markdown += `| \`${route}\` | **${formatBytes(sizes.gzip)}** | ${formatDiff(sizes.gzip, baselineSize)} |\n`;
+    markdown += `| \`${route}\` | **${formatBytes(sizes.gzip)}** | ${formatDiff(sizes.gzip, baselineSize, threshold)} |\n`;
   }
 
   if (!foundRoutes) {
@@ -124,4 +126,16 @@ function generateReport(currentRoutes, baselineRoutes) {
   return markdown;
 }
 
-module.exports = { formatBytes, formatDiff, processStats, parseStatsFile, generateReport };
+/**
+ * Reads the nextBundleAnalysis config from the nearest package.json.
+ *
+ * @param {string} packageJsonPath
+ * @returns {{ minimumChangeThreshold?: number }}
+ */
+function loadConfig(packageJsonPath = 'package.json') {
+  if (!fs.existsSync(packageJsonPath)) return {};
+  const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  return pkg.nextBundleAnalysis || {};
+}
+
+module.exports = { formatBytes, formatDiff, processStats, parseStatsFile, generateReport, loadConfig };
