@@ -62,6 +62,25 @@ describe('formatDiff', () => {
   test('shows diff when diff exceeds threshold', () => {
     assert.equal(formatDiff(1501, 1000, 500), '🔴 +501 B');
   });
+
+  test('shows yellow when increase is below budget-percent-increase-red', () => {
+    // 10% increase (100 out of 1000), budget is 20%
+    assert.equal(formatDiff(1100, 1000, 0, 20), '🟡 +100 B');
+  });
+
+  test('shows red when increase exceeds budget-percent-increase-red', () => {
+    // 30% increase (300 out of 1000), budget is 20%
+    assert.equal(formatDiff(1300, 1000, 0, 20), '🔴 +300 B');
+  });
+
+  test('shows red when increase equals budget-percent-increase-red', () => {
+    // 20% increase (200 out of 1000), budget is 20% — equal means not exceeding
+    assert.equal(formatDiff(1200, 1000, 0, 20), '🟡 +200 B');
+  });
+
+  test('shows red for all increases when budget-percent-increase-red is 0 (default)', () => {
+    assert.equal(formatDiff(1001, 1000, 0, 0), '🔴 +1 B');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -230,6 +249,22 @@ describe('generateReport', () => {
     const report = generateReport(current, baseline);
     assert.ok(report.includes('🗑️ Removed'));
     assert.ok(report.includes('/old'));
+  });
+
+  test('shows yellow for increase below budget-percent-increase-red', () => {
+    const current = { '/': { gzip: 1100 } };
+    const baseline = { '/': { gzip: 1000 } };
+    const report = generateReport(current, baseline, 0, 20);
+    assert.ok(report.includes('🟡'));
+    assert.ok(!report.includes('🔴'));
+  });
+
+  test('shows red for increase above budget-percent-increase-red', () => {
+    const current = { '/': { gzip: 1300 } };
+    const baseline = { '/': { gzip: 1000 } };
+    const report = generateReport(current, baseline, 0, 20);
+    assert.ok(report.includes('🔴'));
+    assert.ok(!report.includes('🟡'));
   });
 
   test('only shows changed routes, omits unchanged', () => {

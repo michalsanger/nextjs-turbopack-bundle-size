@@ -62,3 +62,4 @@ The baseline stats are downloaded to `_bundle-baseline-stats/` in the workspace.
 | `github-token` | required | Artifact download + PR comment |
 | `stats-path` | `.next/server/webpack-stats.json` | Override if build output differs |
 | `artifact-name` | `turbopack-main-stats` | Override to avoid name collisions |
+| `budget-percent-increase-red` | `0` | % threshold; increases above show 🔴, below show 🟡 |
