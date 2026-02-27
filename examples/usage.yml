@@ -29,3 +29,4 @@ jobs:
       - uses: michalsanger/nextjs-turbopack-bundle-size@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          minimum-change-threshold: 256

@@ -174,13 +174,13 @@ describe('processStats', () => {
 // ---------------------------------------------------------------------------
 
 describe('generateReport', () => {
-  test('includes header rows', () => {
+  test('includes header rows when there are changes', () => {
     const report = generateReport({ '/': { gzip: 512 } }, {});
-    assert.ok(report.includes('### 📦 Next.js App Router Sizes (Turbopack)'));
+    assert.ok(report.includes('## 📦 Next.js App Router Sizes (Turbopack)'));
     assert.ok(report.includes('| Route | Size (gzipped) | Diff (vs main) |'));
   });
 
-  test('shows warning when no routes', () => {
+  test('shows warning when no routes at all', () => {
     const report = generateReport({}, {});
     assert.ok(report.includes('⚠️ **Warning:**'));
   });
@@ -202,11 +202,19 @@ describe('generateReport', () => {
     assert.ok(report.includes('**1 KB**'));
   });
 
-  test('treats change below threshold as no change', () => {
+  test('shows no-change message when all routes are identical', () => {
+    const current = { '/': { gzip: 1000 }, '/about': { gzip: 2000 } };
+    const baseline = { '/': { gzip: 1000 }, '/about': { gzip: 2000 } };
+    const report = generateReport(current, baseline);
+    assert.ok(report.includes('no changes to the JavaScript bundle! 🙌'));
+    assert.ok(!report.includes('| Route |'));
+  });
+
+  test('shows no-change message when diff is below threshold', () => {
     const current = { '/': { gzip: 1300 } };
     const baseline = { '/': { gzip: 1000 } };
     const report = generateReport(current, baseline, 500);
-    assert.ok(report.includes('➖ No change'));
+    assert.ok(report.includes('no changes to the JavaScript bundle! 🙌'));
   });
 
   test('shows diff when change exceeds threshold', () => {
@@ -214,5 +222,21 @@ describe('generateReport', () => {
     const baseline = { '/': { gzip: 1000 } };
     const report = generateReport(current, baseline, 500);
     assert.ok(report.includes('🔴 +'));
+  });
+
+  test('shows removed routes', () => {
+    const current = {};
+    const baseline = { '/old': { gzip: 500 } };
+    const report = generateReport(current, baseline);
+    assert.ok(report.includes('🗑️ Removed'));
+    assert.ok(report.includes('/old'));
+  });
+
+  test('only shows changed routes, omits unchanged', () => {
+    const current = { '/': { gzip: 1000 }, '/about': { gzip: 2048 } };
+    const baseline = { '/': { gzip: 1000 }, '/about': { gzip: 1024 } };
+    const report = generateReport(current, baseline);
+    assert.ok(!report.includes('`/`'), 'unchanged route / should not appear');
+    assert.ok(report.includes('`/about`'), 'changed route /about should appear');
   });
 });

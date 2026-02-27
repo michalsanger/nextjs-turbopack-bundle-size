@@ -9,6 +9,7 @@ A GitHub Action that tracks Next.js App Router bundle sizes across pull requests
   uses: michalsanger/nextjs-turbopack-bundle-size@v2
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
+    minimum-change-threshold: 256
 ```
 
 The action must run **after** the app has been built with `TURBOPACK_STATS=1`. See [`examples/usage.yml`](examples/usage.yml) for a complete workflow.
@@ -37,3 +38,7 @@ permissions:
 - **On pull request**: downloads the baseline artifact, parses both stat files, calculates gzip sizes for each route, and posts (or updates) a sticky comment with a comparison table.
 
 The first PR before any baseline exists will show all routes as "🆕 New" — this is expected.
+
+## Acknowledgements
+
+Inspired by [nextjs-bundle-analysis](https://github.com/hashicorp/nextjs-bundle-analysis) by HashiCorp.
