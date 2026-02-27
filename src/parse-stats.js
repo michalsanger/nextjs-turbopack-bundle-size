@@ -21,16 +21,20 @@ function formatBytes(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+function formatPercent(value) {
+  return value % 1 === 0 ? value.toFixed(0) : value.toFixed(1);
+}
+
 function formatDiff(current, baseline, threshold = 0, budgetPercentIncreaseRed = 0) {
   if (baseline === undefined) return '🆕 New';
   const diff = current - baseline;
   if (Math.abs(diff) <= threshold) return '➖ No change';
+  const percent = (Math.abs(diff) / baseline) * 100;
   if (diff > 0) {
-    const percentIncrease = (diff / baseline) * 100;
-    const icon = percentIncrease > budgetPercentIncreaseRed ? '🔴' : '🟡';
-    return `${icon} +${formatBytes(diff)}`;
+    const icon = percent > budgetPercentIncreaseRed ? '🔴' : '🟡';
+    return `${icon} \`+${formatBytes(diff)}\` (+${formatPercent(percent)}%)`;
   }
-  return `🟢 ${formatBytes(Math.abs(diff))}`;
+  return `🟢 \`-${formatBytes(Math.abs(diff))}\` (-${formatPercent(percent)}%)`;
 }
 
 /**
@@ -127,13 +131,13 @@ function generateReport(currentRoutes, baselineRoutes, threshold = 0, budgetPerc
     const baseline = baselineRoutes[route];
 
     if (current && baseline === undefined) {
-      changedRows.push(`| \`${route}\` | **${formatBytes(current.gzip)}** | 🆕 New |`);
+      changedRows.push(`| \`${route}\` | \`${formatBytes(current.gzip)}\` | 🆕 New |`);
     } else if (current === undefined && baseline) {
       changedRows.push(`| \`${route}\` | — | 🗑️ Removed |`);
     } else if (current && baseline) {
       const diff = Math.abs(current.gzip - baseline.gzip);
       if (diff > threshold) {
-        changedRows.push(`| \`${route}\` | **${formatBytes(current.gzip)}** | ${formatDiff(current.gzip, baseline.gzip, threshold, budgetPercentIncreaseRed)} |`);
+        changedRows.push(`| \`${route}\` | \`${formatBytes(current.gzip)}\` | ${formatDiff(current.gzip, baseline.gzip, threshold, budgetPercentIncreaseRed)} |`);
       }
     }
   }
