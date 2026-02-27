@@ -81,6 +81,14 @@ describe('formatDiff', () => {
   test('shows red for all increases when budget-percent-increase-red is 0 (default)', () => {
     assert.equal(formatDiff(1001, 1000, 0, 0), '🔴 `+1 B` (+0.1%)');
   });
+
+  test('shows increase without percentage when baseline is 0', () => {
+    assert.equal(formatDiff(1024, 0), '🔴 `+1 KB`');
+  });
+
+  test('shows decrease without percentage when baseline is 0', () => {
+    assert.equal(formatDiff(0, 0), '➖ No change');
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -29,6 +29,11 @@ function formatDiff(current, baseline, threshold = 0, budgetPercentIncreaseRed =
   if (baseline === undefined) return '🆕 New';
   const diff = current - baseline;
   if (Math.abs(diff) <= threshold) return '➖ No change';
+  if (baseline === 0) {
+    return diff > 0
+      ? `🔴 \`+${formatBytes(diff)}\``
+      : `🟢 \`-${formatBytes(Math.abs(diff))}\``;
+  }
   const percent = (Math.abs(diff) / baseline) * 100;
   if (diff > 0) {
     const icon = percent > budgetPercentIncreaseRed ? '🔴' : '🟡';
@@ -153,4 +158,26 @@ function generateReport(currentRoutes, baselineRoutes, threshold = 0, budgetPerc
   return markdown;
 }
 
-module.exports = { formatBytes, formatDiff, processStats, parseStatsFile, generateReport };
+/**
+ * Parses stats, computes gzip sizes, and saves the result as JSON.
+ *
+ * @param {string} statsPath - Path to webpack-stats.json
+ * @param {string} outputPath - Path to write the computed route sizes
+ */
+function saveRouteSizes(statsPath, outputPath) {
+  const routes = parseStatsFile(statsPath, true);
+  fs.writeFileSync(outputPath, JSON.stringify(routes));
+}
+
+/**
+ * Loads pre-computed route sizes from a JSON file.
+ *
+ * @param {string} sizesPath - Path to the saved route sizes JSON
+ * @returns {Record<string, { gzip: number }>}
+ */
+function loadRouteSizes(sizesPath) {
+  if (!fs.existsSync(sizesPath)) return {};
+  return JSON.parse(fs.readFileSync(sizesPath, 'utf8'));
+}
+
+module.exports = { formatBytes, formatDiff, processStats, parseStatsFile, generateReport, saveRouteSizes, loadRouteSizes };
