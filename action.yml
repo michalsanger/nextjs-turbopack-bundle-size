@@ -22,6 +22,10 @@ inputs:
     description: 'Byte threshold below which a size change is considered unchanged'
     required: false
     default: '0'
+  budget-percent-increase-red:
+    description: 'Percentage threshold for showing 🔴 on size increases. Increases above this percentage show 🔴, others show 🟡. Default 0 means all increases show 🔴.'
+    required: false
+    default: '0'
 
 runs:
   using: composite
@@ -51,6 +55,7 @@ runs:
         STATS_PATH: ${{ inputs.stats-path }}
         ACTION_PATH: ${{ github.action_path }}
         MINIMUM_CHANGE_THRESHOLD: ${{ inputs.minimum-change-threshold }}
+        BUDGET_PERCENT_INCREASE_RED: ${{ inputs.budget-percent-increase-red }}
       with:
         script: |
           const path = require('path');
@@ -60,13 +65,14 @@ runs:
           );
 
           const threshold = parseInt(process.env.MINIMUM_CHANGE_THRESHOLD) || 0;
+          const budgetPercentIncreaseRed = parseInt(process.env.BUDGET_PERCENT_INCREASE_RED) || 0;
           const currentRoutes = parseStatsFile(process.env.STATS_PATH, true);
           const baselineRoutes = parseStatsFile(
             path.join('_bundle-baseline-stats', 'webpack-stats.json'),
             false,
           );
 
-          fs.writeFileSync('bundle-report.md', generateReport(currentRoutes, baselineRoutes, threshold));
+          fs.writeFileSync('bundle-report.md', generateReport(currentRoutes, baselineRoutes, threshold, budgetPercentIncreaseRed));
 
     - name: Post or update PR comment
       if: github.event_name == 'pull_request'

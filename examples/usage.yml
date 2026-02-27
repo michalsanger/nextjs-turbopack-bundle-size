@@ -26,7 +26,8 @@ jobs:
 
       - run: TURBOPACK_STATS=1 npm run build
 
-      - uses: michalsanger/nextjs-turbopack-bundle-size@v2
+      - uses: michalsanger/nextjs-turbopack-bundle-size@v3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           minimum-change-threshold: 256
+          budget-percent-increase-red: 20

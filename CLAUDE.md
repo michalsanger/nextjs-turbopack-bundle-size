@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A GitHub **Composite Action** that tracks Next.js App Router bundle sizes across PRs using Turbopack stats. Users reference it as a step in their own workflows:
 
 ```yaml
-- uses: michalsanger/nextjs-turbopack-bundle-size@v2
+- uses: michalsanger/nextjs-turbopack-bundle-size@v3
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -62,3 +62,4 @@ The baseline stats are downloaded to `_bundle-baseline-stats/` in the workspace.
 | `github-token` | required | Artifact download + PR comment |
 | `stats-path` | `.next/server/webpack-stats.json` | Override if build output differs |
 | `artifact-name` | `turbopack-main-stats` | Override to avoid name collisions |
+| `budget-percent-increase-red` | `0` | % threshold; increases above show 🔴, below show 🟡 |
