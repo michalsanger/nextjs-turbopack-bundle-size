@@ -104,7 +104,7 @@ describe('processStats', () => {
     assert.deepEqual(processStats({}), {});
   });
 
-  test('filters out internal chunks', () => {
+  test('aggregates internal chunks into global entry', () => {
     const stats = makeStats({
       webpack: { assets: [{ name: 'webpack.js' }] },
       'main-app': { assets: [{ name: 'main-app.js' }] },
@@ -114,11 +114,22 @@ describe('processStats', () => {
       'edge-wrapper': { assets: [{ name: 'edge-wrapper.js' }] },
     }, [
       { name: 'webpack.js', size: 1000 },
-      { name: 'main-app.js', size: 1000 },
-      { name: 'main.js', size: 1000 },
-      { name: 'polyfills.js', size: 1000 },
-      { name: 'react-refresh.js', size: 1000 },
-      { name: 'edge-wrapper.js', size: 1000 },
+      { name: 'main-app.js', size: 2000 },
+      { name: 'main.js', size: 1500 },
+      { name: 'polyfills.js', size: 500 },
+      { name: 'react-refresh.js', size: 800 },
+      { name: 'edge-wrapper.js', size: 700 },
+    ]);
+    const routes = processStats(stats, () => 100);
+    assert.deepEqual(Object.keys(routes), ['global']);
+    assert.equal(routes['global'].gzip, 600); // 6 chunks × 100
+  });
+
+  test('does not create global entry when internal chunks have no JS assets', () => {
+    const stats = makeStats({
+      webpack: { assets: [{ name: 'webpack.css' }] },
+    }, [
+      { name: 'webpack.css', size: 1000 },
     ]);
     assert.deepEqual(processStats(stats), {});
   });
@@ -300,7 +311,7 @@ describe('generateReport full table', () => {
   });
 
   test('all routes unchanged', () => {
-    const routes = { '/': { gzip: 1024 }, '/about': { gzip: 2048 } };
+    const routes = { 'global': { gzip: 5000 }, '/': { gzip: 1024 }, '/about': { gzip: 2048 } };
     assert.equal(
       generateReport(routes, routes),
       REPORT_HEADER +
@@ -310,10 +321,11 @@ describe('generateReport full table', () => {
 
   test('new route without baseline', () => {
     assert.equal(
-      generateReport({ '/': { gzip: 512 } }, {}),
+      generateReport({ 'global': { gzip: 5000 }, '/': { gzip: 512 } }, {}),
       REPORT_HEADER +
         '| Route | Size (gzipped) | Diff (vs main) |\n' +
         '|---|---|---|\n' +
+        '| `global` | `4.88 KB` | 🆕 New |\n' +
         '| `/` | `512 B` | 🆕 New |\n',
     );
   });
@@ -330,7 +342,10 @@ describe('generateReport full table', () => {
 
   test('size increase', () => {
     assert.equal(
-      generateReport({ '/': { gzip: 1536 } }, { '/': { gzip: 1024 } }),
+      generateReport(
+        { 'global': { gzip: 5000 }, '/': { gzip: 1536 } },
+        { 'global': { gzip: 5000 }, '/': { gzip: 1024 } },
+      ),
       REPORT_HEADER +
         '| Route | Size (gzipped) | Diff (vs main) |\n' +
         '|---|---|---|\n' +
@@ -340,7 +355,10 @@ describe('generateReport full table', () => {
 
   test('size decrease', () => {
     assert.equal(
-      generateReport({ '/': { gzip: 512 } }, { '/': { gzip: 1024 } }),
+      generateReport(
+        { 'global': { gzip: 5000 }, '/': { gzip: 512 } },
+        { 'global': { gzip: 5000 }, '/': { gzip: 1024 } },
+      ),
       REPORT_HEADER +
         '| Route | Size (gzipped) | Diff (vs main) |\n' +
         '|---|---|---|\n' +
@@ -350,12 +368,14 @@ describe('generateReport full table', () => {
 
   test('mixed: new, removed, increased, decreased, and unchanged routes', () => {
     const current = {
+      'global': { gzip: 5120 },  // increased from 5000
       '/': { gzip: 1024 },       // unchanged
       '/about': { gzip: 2048 },  // increased from 1024
       '/blog': { gzip: 512 },    // decreased from 1024
       '/new': { gzip: 256 },     // new
     };
     const baseline = {
+      'global': { gzip: 5000 },
       '/': { gzip: 1024 },       // unchanged
       '/about': { gzip: 1024 },
       '/blog': { gzip: 1024 },
@@ -366,6 +386,7 @@ describe('generateReport full table', () => {
       REPORT_HEADER +
         '| Route | Size (gzipped) | Diff (vs main) |\n' +
         '|---|---|---|\n' +
+        '| `global` | `5 KB` | 🔴 `+120 B` (+2.4%) |\n' +
         '| `/about` | `2 KB` | 🔴 `+1 KB` (+100%) |\n' +
         '| `/blog` | `512 B` | 🟢 `-512 B` (-50%) |\n' +
         '| `/new` | `256 B` | 🆕 New |\n' +
@@ -375,10 +396,12 @@ describe('generateReport full table', () => {
 
   test('threshold hides small changes, shows large ones', () => {
     const current = {
+      'global': { gzip: 5100 },  // +100, within threshold
       '/small': { gzip: 1300 },  // +300, within threshold
       '/large': { gzip: 2024 },  // +1000, exceeds threshold
     };
     const baseline = {
+      'global': { gzip: 5000 },
       '/small': { gzip: 1000 },
       '/large': { gzip: 1024 },
     };
@@ -393,10 +416,12 @@ describe('generateReport full table', () => {
 
   test('budget-percent-increase-red: yellow for small increase, red for large', () => {
     const current = {
+      'global': { gzip: 5000 },  // unchanged
       '/minor': { gzip: 1100 },  // +10%, below 20% budget
       '/major': { gzip: 1500 },  // +50%, above 20% budget
     };
     const baseline = {
+      'global': { gzip: 5000 },
       '/minor': { gzip: 1000 },
       '/major': { gzip: 1000 },
     };
@@ -411,8 +436,8 @@ describe('generateReport full table', () => {
   });
 
   test('all changes below threshold results in no-change message', () => {
-    const current = { '/': { gzip: 1100 }, '/about': { gzip: 2100 } };
-    const baseline = { '/': { gzip: 1000 }, '/about': { gzip: 2000 } };
+    const current = { 'global': { gzip: 5050 }, '/': { gzip: 1100 }, '/about': { gzip: 2100 } };
+    const baseline = { 'global': { gzip: 5000 }, '/': { gzip: 1000 }, '/about': { gzip: 2000 } };
     assert.equal(
       generateReport(current, baseline, 500),
       REPORT_HEADER +

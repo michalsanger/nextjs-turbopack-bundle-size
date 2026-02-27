@@ -59,8 +59,11 @@ function processStats(stats, getGzipSize = null) {
   const entrypoints = stats.namedChunkGroups || stats.entrypoints || {};
   const routes = {};
 
+  let globalRaw = 0;
+  let globalGzip = 0;
+
   for (const [routeName, chunkGroup] of Object.entries(entrypoints)) {
-    if (INTERNAL_CHUNKS.some((chunk) => routeName.includes(chunk))) continue;
+    const isInternal = INTERNAL_CHUNKS.some((chunk) => routeName.includes(chunk));
 
     let totalRaw = 0;
     let totalGzip = 0;
@@ -73,11 +76,21 @@ function processStats(stats, getGzipSize = null) {
       if (getGzipSize) totalGzip += getGzipSize(assetName);
     });
 
+    if (isInternal) {
+      globalRaw += totalRaw;
+      globalGzip += totalGzip;
+      continue;
+    }
+
     if (totalRaw === 0) continue;
 
     let cleanRoute = routeName.replace(/^app/, '').replace(/\/page$/, '');
     cleanRoute = cleanRoute === '' ? '/' : cleanRoute;
     routes[cleanRoute] = { gzip: totalGzip };
+  }
+
+  if (globalRaw > 0) {
+    routes['global'] = { gzip: globalGzip };
   }
 
   return routes;

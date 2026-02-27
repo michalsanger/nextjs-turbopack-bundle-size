@@ -25,6 +25,7 @@ The action posts a comment like this on every pull request:
 >
 > | Route | Size (gzipped) | Diff (vs main) |
 > |---|---|---|
+> | `global` | `214.5 KB` | 🟡 `+1.2 KB` (+0.6%) |
 > | `/` | `85.2 KB` | 🟢 `-1.5 KB` (-1.7%) |
 > | `/about` | `42.3 KB` | 🔴 `+3.1 KB` (+7.9%) |
 > | `/blog` | `38.7 KB` | ➖ No change |
