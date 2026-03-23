@@ -94,7 +94,7 @@ runs:
 
     - name: Post or update PR comment
       if: github.event_name == 'pull_request'
-      uses: marocchino/sticky-pull-request-comment@v2.9.4
+      uses: marocchino/sticky-pull-request-comment@v3.0.2
       with:
         header: bundle-size-report
         path: bundle-report.md
