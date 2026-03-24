@@ -2,7 +2,7 @@
 
 const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
-const { formatBytes, formatDiff, processStats, generateReport } = require('./parse-stats.js');
+const { formatBytes, formatDiff, processStats, processNewStats, generateReport } = require('./parse-stats.js');
 
 // ---------------------------------------------------------------------------
 // formatBytes
@@ -208,6 +208,109 @@ describe('processStats', () => {
 });
 
 // ---------------------------------------------------------------------------
+// processNewStats (Next.js 16.2+ route-bundle-stats.json format)
+// ---------------------------------------------------------------------------
+
+function makeNewStats(routes) {
+  return routes.map(([route, bytes, chunks]) => ({
+    route,
+    firstLoadUncompressedJsBytes: bytes,
+    firstLoadChunkPaths: chunks,
+  }));
+}
+
+describe('processNewStats', () => {
+  test('returns empty object for empty array', () => {
+    assert.deepEqual(processNewStats([]), {});
+  });
+
+  test('returns empty object for non-array', () => {
+    assert.deepEqual(processNewStats({}), {});
+  });
+
+  test('extracts routes with gzip sizes', () => {
+    const stats = makeNewStats([
+      ['/', 1000, ['shared.js', 'home.js']],
+      ['/about', 2000, ['shared.js', 'about.js']],
+    ]);
+    const routes = processNewStats(stats, () => 100);
+    assert.ok('/' in routes);
+    assert.ok('/about' in routes);
+  });
+
+  test('computes shared chunks as global entry', () => {
+    const stats = makeNewStats([
+      ['/', 1000, ['shared.js', 'framework.js', 'home.js']],
+      ['/about', 2000, ['shared.js', 'framework.js', 'about.js']],
+    ]);
+    const routes = processNewStats(stats, () => 100);
+    // shared.js + framework.js are shared → global = 200
+    assert.equal(routes['global'].gzip, 200);
+    // home.js is route-specific → / = 100
+    assert.equal(routes['/'].gzip, 100);
+    // about.js is route-specific → /about = 100
+    assert.equal(routes['/about'].gzip, 100);
+  });
+
+  test('no global entry when getGzipSize is null', () => {
+    const stats = makeNewStats([
+      ['/', 1000, ['shared.js', 'home.js']],
+      ['/about', 2000, ['shared.js', 'about.js']],
+    ]);
+    const routes = processNewStats(stats);
+    assert.ok(!('global' in routes));
+  });
+
+  test('skips routes with zero bytes', () => {
+    const stats = makeNewStats([
+      ['/', 1000, ['shared.js']],
+      ['/empty', 0, ['shared.js']],
+    ]);
+    const routes = processNewStats(stats, () => 100);
+    assert.ok(!('/empty' in routes));
+  });
+
+  test('ignores non-JS chunk paths', () => {
+    const stats = makeNewStats([
+      ['/', 1000, ['shared.js', 'styles.css', 'home.js']],
+      ['/about', 2000, ['shared.js', 'styles.css', 'about.js']],
+    ]);
+    const calls = [];
+    const getGzipSize = (name) => { calls.push(name); return 100; };
+    processNewStats(stats, getGzipSize);
+    assert.ok(!calls.includes('styles.css'));
+  });
+
+  test('route names are used as-is (already clean)', () => {
+    const stats = makeNewStats([
+      ['/holdings/[id]', 5000, ['shared.js', 'holdings.js']],
+      ['/login/[[...rest]]', 3000, ['shared.js', 'login.js']],
+    ]);
+    const routes = processNewStats(stats, () => 100);
+    assert.ok('/holdings/[id]' in routes);
+    assert.ok('/login/[[...rest]]' in routes);
+  });
+
+  test('single route: all chunks are shared, route is filtered out', () => {
+    const stats = makeNewStats([
+      ['/', 1000, ['a.js', 'b.js']],
+    ]);
+    // With only one route, all chunks are "shared" (present in all routes)
+    const routes = processNewStats(stats, () => 100);
+    assert.equal(routes['global'].gzip, 200);
+    assert.ok(!('/' in routes), 'route with 0 gzip should be filtered out');
+  });
+
+  test('skips entries without route name', () => {
+    const stats = [
+      { firstLoadUncompressedJsBytes: 1000, firstLoadChunkPaths: ['a.js'] },
+    ];
+    const routes = processNewStats(stats, () => 100);
+    assert.ok(!('undefined' in routes));
+  });
+});
+
+// ---------------------------------------------------------------------------
 // generateReport
 // ---------------------------------------------------------------------------
 
@@ -389,8 +492,8 @@ describe('generateReport full table', () => {
         '| `global` | `5 KB` | 🔴 `+120 B` (+2.4%) |\n' +
         '| `/about` | `2 KB` | 🔴 `+1 KB` (+100%) |\n' +
         '| `/blog` | `512 B` | 🟢 `-512 B` (-50%) |\n' +
-        '| `/new` | `256 B` | 🆕 New |\n' +
-        '| `/gone` | — | 🗑️ Removed |\n',
+        '| `/gone` | — | 🗑️ Removed |\n' +
+        '| `/new` | `256 B` | 🆕 New |\n',
     );
   });
 
@@ -430,8 +533,8 @@ describe('generateReport full table', () => {
       REPORT_HEADER +
         '| Route | Size (gzipped) | Diff (vs baseline) |\n' +
         '|---|---|---|\n' +
-        '| `/minor` | `1.07 KB` | 🟡 `+100 B` (+10%) |\n' +
-        '| `/major` | `1.46 KB` | 🔴 `+500 B` (+50%) |\n',
+        '| `/major` | `1.46 KB` | 🔴 `+500 B` (+50%) |\n' +
+        '| `/minor` | `1.07 KB` | 🟡 `+100 B` (+10%) |\n',
     );
   });
 

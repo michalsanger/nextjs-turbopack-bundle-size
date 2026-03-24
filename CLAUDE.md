@@ -46,12 +46,14 @@ All logic lives in `src/parse-stats.js` and is loaded by the `github-script` ste
 
 Exported functions:
 
-- `processStats(stats, getGzipSize?)` — pure function; takes a parsed stats object and an optional gzip-size callback; returns a routes map. Filters internal chunks, sums `.js` assets only, normalizes route names (strips `app` prefix and `/page` suffix; empty string → `/`).
-- `parseStatsFile(statsPath, calculateGzip)` — I/O wrapper; reads JSON from disk, builds the `getGzipSize` callback using `zlib.gzipSync`, delegates to `processStats`.
+- `processStats(stats, getGzipSize?)` — pure function; handles the **legacy** webpack-stats.json format (object with `assets` + `namedChunkGroups`). Filters internal chunks, sums `.js` assets only, normalizes route names (strips `app` prefix and `/page` suffix; empty string → `/`).
+- `processNewStats(stats, getGzipSize?)` — pure function; handles the **new** route-bundle-stats.json format (Next.js 16.2+). Input is an array of `{ route, firstLoadUncompressedJsBytes, firstLoadChunkPaths }`. Extracts shared chunks (present in all routes) into a `global` entry; per-route sizes exclude shared chunks.
+- `resolveStatsPath(statsPath)` — checks known stats file locations; falls back to `.next/diagnostics/route-bundle-stats.json` (new) or `.next/server/webpack-stats.json` (legacy).
+- `parseStatsFile(statsPath, calculateGzip)` — I/O wrapper; resolves the path, reads JSON from disk, auto-detects format (array → new, object → legacy), delegates to the appropriate processor.
 - `generateReport(currentRoutes, baselineRoutes)` — pure function; builds the markdown table string.
 - `formatBytes(bytes)` / `formatDiff(current, baseline)` — pure formatting helpers.
 
-The `processStats`/`parseStatsFile` split keeps I/O at the boundary and makes the core logic testable without touching the filesystem.
+The `processStats`/`processNewStats`/`parseStatsFile` split keeps I/O at the boundary and makes the core logic testable without touching the filesystem.
 
 The baseline stats are downloaded to `_bundle-baseline-stats/` in the workspace.
 
@@ -60,6 +62,6 @@ The baseline stats are downloaded to `_bundle-baseline-stats/` in the workspace.
 | Input | Default | Purpose |
 |---|---|---|
 | `github-token` | required | Artifact download + PR comment |
-| `stats-path` | `.next/server/webpack-stats.json` | Override if build output differs |
+| `stats-path` | `.next/diagnostics/route-bundle-stats.json` | Override if build output differs; auto-detects legacy path |
 | `artifact-name` | `turbopack-main-stats` | Override to avoid name collisions |
 | `budget-percent-increase-red` | `0` | % threshold; increases above show 🔴, below show 🟡 |
