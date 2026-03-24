@@ -511,8 +511,8 @@ describe('generateReport full table', () => {
       REPORT_HEADER +
         '| Route | Size (gzipped) | First load | Diff (vs baseline) |\n' +
         '|---|---|---|---|\n' +
-        '| `global` | `4.88 KB` | — | 🆕 New |\n' +
-        '| `/` | `512 B` | `5.38 KB` | 🆕 New |\n',
+        '| `global` | <nobr>`4.88 KB`</nobr> | — | <nobr>🆕 New</nobr> |\n' +
+        '| `/` | <nobr>`512 B`</nobr> | <nobr>`5.38 KB`</nobr> | <nobr>🆕 New</nobr> |\n',
     );
   });
 
@@ -522,7 +522,7 @@ describe('generateReport full table', () => {
       REPORT_HEADER +
         '| Route | Size (gzipped) | First load | Diff (vs baseline) |\n' +
         '|---|---|---|---|\n' +
-        '| `/old` | — | — | 🗑️ Removed |\n',
+        '| `/old` | — | — | <nobr>🗑️ Removed</nobr> |\n',
     );
   });
 
@@ -535,7 +535,7 @@ describe('generateReport full table', () => {
       REPORT_HEADER +
         '| Route | Size (gzipped) | First load | Diff (vs baseline) |\n' +
         '|---|---|---|---|\n' +
-        '| `/` | `1.5 KB` | `6.38 KB` | 🔴 `+512 B` (+50%) |\n',
+        '| `/` | <nobr>`1.5 KB`</nobr> | <nobr>`6.38 KB`</nobr> | <nobr>🔴 `+512 B` (+50%)</nobr> |\n',
     );
   });
 
@@ -548,7 +548,7 @@ describe('generateReport full table', () => {
       REPORT_HEADER +
         '| Route | Size (gzipped) | First load | Diff (vs baseline) |\n' +
         '|---|---|---|---|\n' +
-        '| `/` | `512 B` | `5.38 KB` | 🟢 `-512 B` (-50%) |\n',
+        '| `/` | <nobr>`512 B`</nobr> | <nobr>`5.38 KB`</nobr> | <nobr>🟢 `-512 B` (-50%)</nobr> |\n',
     );
   });
 
@@ -572,11 +572,11 @@ describe('generateReport full table', () => {
       REPORT_HEADER +
         '| Route | Size (gzipped) | First load | Diff (vs baseline) |\n' +
         '|---|---|---|---|\n' +
-        '| `global` | `5 KB` | — | 🔴 `+120 B` (+2.4%) |\n' +
-        '| `/about` | `2 KB` | `7 KB` | 🔴 `+1 KB` (+100%) |\n' +
-        '| `/blog` | `512 B` | `5.5 KB` | 🟢 `-512 B` (-50%) |\n' +
-        '| `/gone` | — | — | 🗑️ Removed |\n' +
-        '| `/new` | `256 B` | `5.25 KB` | 🆕 New |\n',
+        '| `global` | <nobr>`5 KB`</nobr> | — | <nobr>🔴 `+120 B` (+2.4%)</nobr> |\n' +
+        '| `/about` | <nobr>`2 KB`</nobr> | <nobr>`7 KB`</nobr> | <nobr>🔴 `+1 KB` (+100%)</nobr> |\n' +
+        '| `/blog` | <nobr>`512 B`</nobr> | <nobr>`5.5 KB`</nobr> | <nobr>🟢 `-512 B` (-50%)</nobr> |\n' +
+        '| `/gone` | — | — | <nobr>🗑️ Removed</nobr> |\n' +
+        '| `/new` | <nobr>`256 B`</nobr> | <nobr>`5.25 KB`</nobr> | <nobr>🆕 New</nobr> |\n',
     );
   });
 
@@ -596,7 +596,7 @@ describe('generateReport full table', () => {
       REPORT_HEADER +
         '| Route | Size (gzipped) | First load | Diff (vs baseline) |\n' +
         '|---|---|---|---|\n' +
-        '| `/large` | `1.98 KB` | `6.96 KB` | 🔴 `+1000 B` (+97.7%) |\n',
+        '| `/large` | <nobr>`1.98 KB`</nobr> | <nobr>`6.96 KB`</nobr> | <nobr>🔴 `+1000 B` (+97.7%)</nobr> |\n',
     );
   });
 
@@ -616,8 +616,8 @@ describe('generateReport full table', () => {
       REPORT_HEADER +
         '| Route | Size (gzipped) | First load | Diff (vs baseline) |\n' +
         '|---|---|---|---|\n' +
-        '| `/major` | `1.46 KB` | `6.35 KB` | 🔴 `+500 B` (+50%) |\n' +
-        '| `/minor` | `1.07 KB` | `5.96 KB` | 🟡 `+100 B` (+10%) |\n',
+        '| `/major` | <nobr>`1.46 KB`</nobr> | <nobr>`6.35 KB`</nobr> | <nobr>🔴 `+500 B` (+50%)</nobr> |\n' +
+        '| `/minor` | <nobr>`1.07 KB`</nobr> | <nobr>`5.96 KB`</nobr> | <nobr>🟡 `+100 B` (+10%)</nobr> |\n',
     );
   });
 

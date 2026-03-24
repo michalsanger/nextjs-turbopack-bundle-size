@@ -279,15 +279,15 @@ function generateReport(currentRoutes, baselineRoutes, threshold = 0, budgetPerc
     const isGlobal = route === 'global';
 
     if (current && baseline === undefined) {
-      const firstLoad = isGlobal ? ' — |' : ` \`${formatBytes(current.gzip + currentGlobal)}\` |`;
-      changedRows.push(`| \`${route}\` | \`${formatBytes(current.gzip)}\` |${firstLoad} 🆕 New |`);
+      const firstLoad = isGlobal ? ' — |' : ` <nobr>\`${formatBytes(current.gzip + currentGlobal)}\`</nobr> |`;
+      changedRows.push(`| \`${route}\` | <nobr>\`${formatBytes(current.gzip)}\`</nobr> |${firstLoad} <nobr>🆕 New</nobr> |`);
     } else if (current === undefined && baseline) {
-      changedRows.push(`| \`${route}\` | — | — | 🗑️ Removed |`);
+      changedRows.push(`| \`${route}\` | — | — | <nobr>🗑️ Removed</nobr> |`);
     } else if (current && baseline) {
       const diff = Math.abs(current.gzip - baseline.gzip);
       if (diff > threshold) {
-        const firstLoad = isGlobal ? ' — |' : ` \`${formatBytes(current.gzip + currentGlobal)}\` |`;
-        changedRows.push(`| \`${route}\` | \`${formatBytes(current.gzip)}\` |${firstLoad} ${formatDiff(current.gzip, baseline.gzip, threshold, budgetPercentIncreaseRed)} |`);
+        const firstLoad = isGlobal ? ' — |' : ` <nobr>\`${formatBytes(current.gzip + currentGlobal)}\`</nobr> |`;
+        changedRows.push(`| \`${route}\` | <nobr>\`${formatBytes(current.gzip)}\`</nobr> |${firstLoad} <nobr>${formatDiff(current.gzip, baseline.gzip, threshold, budgetPercentIncreaseRed)}</nobr> |`);
       }
     }
   }
