@@ -25,11 +25,11 @@ The action posts a comment like this on every pull request:
 >
 > | Route | Size (gzipped) | First load | Diff (vs baseline) |
 > |---|---|---|---|
-> | `global` | `214.5 KB` | — | 🟡 `+1.2 KB` (+0.6%) |
-> | `/` | `85.2 KB` | `299.7 KB` | 🟢 `-1.5 KB` (-1.7%) |
-> | `/about` | `42.3 KB` | `256.8 KB` | 🔴 `+3.1 KB` (+7.9%) |
+> | `global` | `214.5 KB` | — | 🟡 `+1.2 KB` |
+> | `/` | `85.2 KB` | `299.7 KB` | 🟢 `-1.5 KB` |
+> | `/about` | `42.3 KB` | `256.8 KB` | 🔴 `+3.1 KB` |
 > | `/blog` | `38.7 KB` | `253.2 KB` | ➖ No change |
-> | `/dashboard` | `51.4 KB` | `265.9 KB` | 🟡 `+800 B` (+1.6%) |
+> | `/dashboard` | `51.4 KB` | `265.9 KB` | 🟡 `+800 B` |
 > | `/settings` | `29.1 KB` | `243.6 KB` | 🆕 New |
 > | `/old-page` | — | — | 🗑️ Removed |
 

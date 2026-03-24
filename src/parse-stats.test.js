@@ -44,11 +44,11 @@ describe('formatDiff', () => {
   });
 
   test('shows green for decrease', () => {
-    assert.equal(formatDiff(512, 1024), '🟢 `-512 B` (-50%)');
+    assert.equal(formatDiff(512, 1024), '🟢 `-512 B`');
   });
 
   test('shows red for increase', () => {
-    assert.equal(formatDiff(1024, 512), '🔴 `+512 B` (+100%)');
+    assert.equal(formatDiff(1024, 512), '🔴 `+512 B`');
   });
 
   test('shows No change when diff is below threshold', () => {
@@ -60,26 +60,26 @@ describe('formatDiff', () => {
   });
 
   test('shows diff when diff exceeds threshold', () => {
-    assert.equal(formatDiff(1501, 1000, 500), '🔴 `+501 B` (+50.1%)');
+    assert.equal(formatDiff(1501, 1000, 500), '🔴 `+501 B`');
   });
 
   test('shows yellow when increase is below budget-percent-increase-red', () => {
     // 10% increase (100 out of 1000), budget is 20%
-    assert.equal(formatDiff(1100, 1000, 0, 20), '🟡 `+100 B` (+10%)');
+    assert.equal(formatDiff(1100, 1000, 0, 20), '🟡 `+100 B`');
   });
 
   test('shows red when increase exceeds budget-percent-increase-red', () => {
     // 30% increase (300 out of 1000), budget is 20%
-    assert.equal(formatDiff(1300, 1000, 0, 20), '🔴 `+300 B` (+30%)');
+    assert.equal(formatDiff(1300, 1000, 0, 20), '🔴 `+300 B`');
   });
 
   test('shows red when increase equals budget-percent-increase-red', () => {
     // 20% increase (200 out of 1000), budget is 20% — equal means not exceeding
-    assert.equal(formatDiff(1200, 1000, 0, 20), '🟡 `+200 B` (+20%)');
+    assert.equal(formatDiff(1200, 1000, 0, 20), '🟡 `+200 B`');
   });
 
   test('shows red for all increases when budget-percent-increase-red is 0 (default)', () => {
-    assert.equal(formatDiff(1001, 1000, 0, 0), '🔴 `+1 B` (+0.1%)');
+    assert.equal(formatDiff(1001, 1000, 0, 0), '🔴 `+1 B`');
   });
 
   test('shows increase without percentage when baseline is 0', () => {
@@ -511,8 +511,8 @@ describe('generateReport full table', () => {
       REPORT_HEADER +
         '| Route | Size (gzipped) | First load | Diff (vs baseline) |\n' +
         '|---|---|---|---|\n' +
-        '| `global` | <nobr>`4.88 KB`</nobr> | — | <nobr>🆕 New</nobr> |\n' +
-        '| `/` | <nobr>`512 B`</nobr> | <nobr>`5.38 KB`</nobr> | <nobr>🆕 New</nobr> |\n',
+        '| `global` | `4.88 KB` | — | 🆕 New |\n' +
+        '| `/` | `512 B` | `5.38 KB` | 🆕 New |\n',
     );
   });
 
@@ -522,7 +522,7 @@ describe('generateReport full table', () => {
       REPORT_HEADER +
         '| Route | Size (gzipped) | First load | Diff (vs baseline) |\n' +
         '|---|---|---|---|\n' +
-        '| `/old` | — | — | <nobr>🗑️ Removed</nobr> |\n',
+        '| `/old` | — | — | 🗑️ Removed |\n',
     );
   });
 
@@ -535,7 +535,7 @@ describe('generateReport full table', () => {
       REPORT_HEADER +
         '| Route | Size (gzipped) | First load | Diff (vs baseline) |\n' +
         '|---|---|---|---|\n' +
-        '| `/` | <nobr>`1.5 KB`</nobr> | <nobr>`6.38 KB`</nobr> | <nobr>🔴 `+512 B` (+50%)</nobr> |\n',
+        '| `/` | `1.5 KB` | `6.38 KB` | 🔴 `+512 B` |\n',
     );
   });
 
@@ -548,7 +548,7 @@ describe('generateReport full table', () => {
       REPORT_HEADER +
         '| Route | Size (gzipped) | First load | Diff (vs baseline) |\n' +
         '|---|---|---|---|\n' +
-        '| `/` | <nobr>`512 B`</nobr> | <nobr>`5.38 KB`</nobr> | <nobr>🟢 `-512 B` (-50%)</nobr> |\n',
+        '| `/` | `512 B` | `5.38 KB` | 🟢 `-512 B` |\n',
     );
   });
 
@@ -572,11 +572,11 @@ describe('generateReport full table', () => {
       REPORT_HEADER +
         '| Route | Size (gzipped) | First load | Diff (vs baseline) |\n' +
         '|---|---|---|---|\n' +
-        '| `global` | <nobr>`5 KB`</nobr> | — | <nobr>🔴 `+120 B` (+2.4%)</nobr> |\n' +
-        '| `/about` | <nobr>`2 KB`</nobr> | <nobr>`7 KB`</nobr> | <nobr>🔴 `+1 KB` (+100%)</nobr> |\n' +
-        '| `/blog` | <nobr>`512 B`</nobr> | <nobr>`5.5 KB`</nobr> | <nobr>🟢 `-512 B` (-50%)</nobr> |\n' +
-        '| `/gone` | — | — | <nobr>🗑️ Removed</nobr> |\n' +
-        '| `/new` | <nobr>`256 B`</nobr> | <nobr>`5.25 KB`</nobr> | <nobr>🆕 New</nobr> |\n',
+        '| `global` | `5 KB` | — | 🔴 `+120 B` |\n' +
+        '| `/about` | `2 KB` | `7 KB` | 🔴 `+1 KB` |\n' +
+        '| `/blog` | `512 B` | `5.5 KB` | 🟢 `-512 B` |\n' +
+        '| `/gone` | — | — | 🗑️ Removed |\n' +
+        '| `/new` | `256 B` | `5.25 KB` | 🆕 New |\n',
     );
   });
 
@@ -596,7 +596,7 @@ describe('generateReport full table', () => {
       REPORT_HEADER +
         '| Route | Size (gzipped) | First load | Diff (vs baseline) |\n' +
         '|---|---|---|---|\n' +
-        '| `/large` | <nobr>`1.98 KB`</nobr> | <nobr>`6.96 KB`</nobr> | <nobr>🔴 `+1000 B` (+97.7%)</nobr> |\n',
+        '| `/large` | `1.98 KB` | `6.96 KB` | 🔴 `+1000 B` |\n',
     );
   });
 
@@ -616,8 +616,8 @@ describe('generateReport full table', () => {
       REPORT_HEADER +
         '| Route | Size (gzipped) | First load | Diff (vs baseline) |\n' +
         '|---|---|---|---|\n' +
-        '| `/major` | <nobr>`1.46 KB`</nobr> | <nobr>`6.35 KB`</nobr> | <nobr>🔴 `+500 B` (+50%)</nobr> |\n' +
-        '| `/minor` | <nobr>`1.07 KB`</nobr> | <nobr>`5.96 KB`</nobr> | <nobr>🟡 `+100 B` (+10%)</nobr> |\n',
+        '| `/major` | `1.46 KB` | `6.35 KB` | 🔴 `+500 B` |\n' +
+        '| `/minor` | `1.07 KB` | `5.96 KB` | 🟡 `+100 B` |\n',
     );
   });
 

@@ -21,10 +21,6 @@ function formatBytes(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-function formatPercent(value) {
-  return value % 1 === 0 ? value.toFixed(0) : value.toFixed(1);
-}
-
 function formatDiff(current, baseline, threshold = 0, budgetPercentIncreaseRed = 0) {
   if (baseline === undefined) return '🆕 New';
   const diff = current - baseline;
@@ -37,9 +33,9 @@ function formatDiff(current, baseline, threshold = 0, budgetPercentIncreaseRed =
   const percent = (Math.abs(diff) / baseline) * 100;
   if (diff > 0) {
     const icon = percent > budgetPercentIncreaseRed ? '🔴' : '🟡';
-    return `${icon} \`+${formatBytes(diff)}\` (+${formatPercent(percent)}%)`;
+    return `${icon} \`+${formatBytes(diff)}\``;
   }
-  return `🟢 \`-${formatBytes(Math.abs(diff))}\` (-${formatPercent(percent)}%)`;
+  return `🟢 \`-${formatBytes(Math.abs(diff))}\``;
 }
 
 /**
@@ -279,15 +275,15 @@ function generateReport(currentRoutes, baselineRoutes, threshold = 0, budgetPerc
     const isGlobal = route === 'global';
 
     if (current && baseline === undefined) {
-      const firstLoad = isGlobal ? ' — |' : ` <nobr>\`${formatBytes(current.gzip + currentGlobal)}\`</nobr> |`;
-      changedRows.push(`| \`${route}\` | <nobr>\`${formatBytes(current.gzip)}\`</nobr> |${firstLoad} <nobr>🆕 New</nobr> |`);
+      const firstLoad = isGlobal ? ' — |' : ` \`${formatBytes(current.gzip + currentGlobal)}\` |`;
+      changedRows.push(`| \`${route}\` | \`${formatBytes(current.gzip)}\` |${firstLoad} 🆕 New |`);
     } else if (current === undefined && baseline) {
-      changedRows.push(`| \`${route}\` | — | — | <nobr>🗑️ Removed</nobr> |`);
+      changedRows.push(`| \`${route}\` | — | — | 🗑️ Removed |`);
     } else if (current && baseline) {
       const diff = Math.abs(current.gzip - baseline.gzip);
       if (diff > threshold) {
-        const firstLoad = isGlobal ? ' — |' : ` <nobr>\`${formatBytes(current.gzip + currentGlobal)}\`</nobr> |`;
-        changedRows.push(`| \`${route}\` | <nobr>\`${formatBytes(current.gzip)}\`</nobr> |${firstLoad} <nobr>${formatDiff(current.gzip, baseline.gzip, threshold, budgetPercentIncreaseRed)}</nobr> |`);
+        const firstLoad = isGlobal ? ' — |' : ` \`${formatBytes(current.gzip + currentGlobal)}\` |`;
+        changedRows.push(`| \`${route}\` | \`${formatBytes(current.gzip)}\` |${firstLoad} ${formatDiff(current.gzip, baseline.gzip, threshold, budgetPercentIncreaseRed)} |`);
       }
     }
   }
