@@ -269,19 +269,25 @@ function generateReport(currentRoutes, baselineRoutes, threshold = 0, budgetPerc
     return markdown;
   }
 
+  const currentGlobal = (currentRoutes['global'] || {}).gzip || 0;
+  const baselineGlobal = (baselineRoutes['global'] || {}).gzip || 0;
+
   const changedRows = [];
   for (const route of allRoutes) {
     const current = currentRoutes[route];
     const baseline = baselineRoutes[route];
+    const isGlobal = route === 'global';
 
     if (current && baseline === undefined) {
-      changedRows.push(`| \`${route}\` | \`${formatBytes(current.gzip)}\` | 🆕 New |`);
+      const firstLoad = isGlobal ? ' — |' : ` \`${formatBytes(current.gzip + currentGlobal)}\` |`;
+      changedRows.push(`| \`${route}\` | \`${formatBytes(current.gzip)}\` |${firstLoad} 🆕 New |`);
     } else if (current === undefined && baseline) {
-      changedRows.push(`| \`${route}\` | — | 🗑️ Removed |`);
+      changedRows.push(`| \`${route}\` | — | — | 🗑️ Removed |`);
     } else if (current && baseline) {
       const diff = Math.abs(current.gzip - baseline.gzip);
       if (diff > threshold) {
-        changedRows.push(`| \`${route}\` | \`${formatBytes(current.gzip)}\` | ${formatDiff(current.gzip, baseline.gzip, threshold, budgetPercentIncreaseRed)} |`);
+        const firstLoad = isGlobal ? ' — |' : ` \`${formatBytes(current.gzip + currentGlobal)}\` |`;
+        changedRows.push(`| \`${route}\` | \`${formatBytes(current.gzip)}\` |${firstLoad} ${formatDiff(current.gzip, baseline.gzip, threshold, budgetPercentIncreaseRed)} |`);
       }
     }
   }
@@ -291,7 +297,7 @@ function generateReport(currentRoutes, baselineRoutes, threshold = 0, budgetPerc
     return markdown;
   }
 
-  markdown += '| Route | Size (gzipped) | Diff (vs baseline) |\n|---|---|---|\n';
+  markdown += '| Route | Size (gzipped) | First load | Diff (vs baseline) |\n|---|---|---|---|\n';
   markdown += changedRows.join('\n') + '\n';
 
   return markdown;
