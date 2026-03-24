@@ -2,7 +2,7 @@
 
 const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
-const { formatBytes, formatDiff, processStats, processNewStats, generateReport } = require('./parse-stats.js');
+const { formatBytes, formatDiff, processStats, processNewStats, buildRouteGroupMap, generateReport } = require('./parse-stats.js');
 
 // ---------------------------------------------------------------------------
 // formatBytes
@@ -281,7 +281,7 @@ describe('processNewStats', () => {
     assert.ok(!calls.includes('styles.css'));
   });
 
-  test('route names are used as-is (already clean)', () => {
+  test('route names are used as-is when no routeGroupMap', () => {
     const stats = makeNewStats([
       ['/holdings/[id]', 5000, ['shared.js', 'holdings.js']],
       ['/login/[[...rest]]', 3000, ['shared.js', 'login.js']],
@@ -289,6 +289,35 @@ describe('processNewStats', () => {
     const routes = processNewStats(stats, () => 100);
     assert.ok('/holdings/[id]' in routes);
     assert.ok('/login/[[...rest]]' in routes);
+  });
+
+  test('restores route group prefixes from routeGroupMap', () => {
+    const stats = makeNewStats([
+      ['/book-session/[hash]', 5000, ['shared.js', 'book.js']],
+      ['/admin/orders', 3000, ['shared.js', 'orders.js']],
+    ]);
+    const routeGroupMap = {
+      '/book-session/[hash]': '/(frontend)/book-session/[hash]',
+      '/admin/orders': '/(admin)/admin/orders',
+    };
+    const routes = processNewStats(stats, () => 100, routeGroupMap);
+    assert.ok('/(frontend)/book-session/[hash]' in routes);
+    assert.ok('/(admin)/admin/orders' in routes);
+    assert.ok(!('/book-session/[hash]' in routes));
+    assert.ok(!('/admin/orders' in routes));
+  });
+
+  test('leaves routes without routeGroupMap entry unchanged', () => {
+    const stats = makeNewStats([
+      ['/about', 2000, ['shared.js', 'about.js']],
+      ['/admin/orders', 3000, ['shared.js', 'orders.js']],
+    ]);
+    const routeGroupMap = {
+      '/admin/orders': '/(admin)/admin/orders',
+    };
+    const routes = processNewStats(stats, () => 100, routeGroupMap);
+    assert.ok('/about' in routes);
+    assert.ok('/(admin)/admin/orders' in routes);
   });
 
   test('single route: all chunks are shared, route is filtered out', () => {
@@ -307,6 +336,60 @@ describe('processNewStats', () => {
     ];
     const routes = processNewStats(stats, () => 100);
     assert.ok(!('undefined' in routes));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildRouteGroupMap
+// ---------------------------------------------------------------------------
+
+const fs = require('fs');
+const path = require('path');
+
+describe('buildRouteGroupMap', () => {
+  const tmpDir = path.join(process.env.TMPDIR || '/tmp', 'parse-stats-test');
+
+  test('returns empty object when manifest does not exist', () => {
+    assert.deepEqual(buildRouteGroupMap('/nonexistent/path.json'), {});
+  });
+
+  test('builds map from manifest with route groups', () => {
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const manifestPath = path.join(tmpDir, 'app-paths-manifest.json');
+    fs.writeFileSync(manifestPath, JSON.stringify({
+      '/(admin)/admin/orders/page': 'app/(admin)/admin/orders/page.js',
+      '/(frontend)/book-session/[hash]/page': 'app/(frontend)/book-session/[hash]/page.js',
+      '/about/page': 'app/about/page.js',
+      '/api/admin/auth/route': 'app/api/admin/auth/route.js',
+    }));
+    const map = buildRouteGroupMap(manifestPath);
+    assert.equal(map['/admin/orders'], '/(admin)/admin/orders');
+    assert.equal(map['/book-session/[hash]'], '/(frontend)/book-session/[hash]');
+    assert.ok(!('/about' in map), 'routes without groups should not appear');
+    assert.ok(!('/api/admin/auth' in map), 'API routes should not appear');
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  test('handles nested route groups', () => {
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const manifestPath = path.join(tmpDir, 'app-paths-manifest.json');
+    fs.writeFileSync(manifestPath, JSON.stringify({
+      '/(marketing)/(landing)/pricing/page': 'app/(marketing)/(landing)/pricing/page.js',
+    }));
+    const map = buildRouteGroupMap(manifestPath);
+    assert.equal(map['/pricing'], '/(marketing)/(landing)/pricing');
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  test('maps root route group to /', () => {
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const manifestPath = path.join(tmpDir, 'app-paths-manifest.json');
+    fs.writeFileSync(manifestPath, JSON.stringify({
+      '/(frontend)/page': 'app/(frontend)/page.js',
+    }));
+    const map = buildRouteGroupMap(manifestPath);
+    assert.equal(map['/'], '/(frontend)');
+    fs.rmSync(tmpDir, { recursive: true });
   });
 });
 

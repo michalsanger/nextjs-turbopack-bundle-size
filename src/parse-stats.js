@@ -43,6 +43,31 @@ function formatDiff(current, baseline, threshold = 0, budgetPercentIncreaseRed =
 }
 
 /**
+ * Builds a map from clean URL routes to their route-group-prefixed paths
+ * using the app-paths-manifest.json file that Next.js generates.
+ *
+ * For example: `/book-session/[hash]` → `/(frontend)/book-session/[hash]`
+ *
+ * @param {string} manifestPath - Path to app-paths-manifest.json
+ * @returns {Record<string, string>} clean route → route-group-prefixed route
+ */
+function buildRouteGroupMap(manifestPath) {
+  if (!fs.existsSync(manifestPath)) return {};
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  const map = {};
+  for (const key of Object.keys(manifest)) {
+    // Only process page routes (not API routes)
+    if (!key.endsWith('/page')) continue;
+    // Skip keys that have no route groups
+    if (!/\/\([^)]+\)/.test(key)) continue;
+    let cleanRoute = key.replace(/\/\([^)]+\)/g, '').replace(/\/page$/, '');
+    cleanRoute = cleanRoute === '' ? '/' : cleanRoute;
+    map[cleanRoute] = key.replace(/\/page$/, '');
+  }
+  return map;
+}
+
+/**
  * Processes the new route-bundle-stats.json format (Next.js 16.2+).
  *
  * The new format is an array of route objects with pre-computed sizes and
@@ -51,9 +76,10 @@ function formatDiff(current, baseline, threshold = 0, budgetPercentIncreaseRed =
  *
  * @param {Array<{ route: string, firstLoadUncompressedJsBytes: number, firstLoadChunkPaths: string[] }>} stats
  * @param {((chunkPath: string) => number) | null} getGzipSize
+ * @param {Record<string, string>} routeGroupMap - clean route → route-group-prefixed route
  * @returns {Record<string, { gzip: number }>}
  */
-function processNewStats(stats, getGzipSize = null) {
+function processNewStats(stats, getGzipSize = null, routeGroupMap = {}) {
   if (!Array.isArray(stats) || stats.length === 0) return {};
 
   // Find JS chunks shared by ALL routes
@@ -96,7 +122,8 @@ function processNewStats(stats, getGzipSize = null) {
 
     if (routeGzip === 0 && getGzipSize) continue;
 
-    routes[route] = { gzip: routeGzip };
+    const routeKey = routeGroupMap[route] || route;
+    routes[routeKey] = { gzip: routeGzip };
   }
 
   return routes;
@@ -212,7 +239,9 @@ function parseStatsFile(statsPath, calculateGzip) {
     : null;
 
   if (Array.isArray(stats)) {
-    return processNewStats(stats, getGzipSize);
+    const manifestPath = path.join(path.dirname(resolvedPath), '..', 'server', 'app-paths-manifest.json');
+    const routeGroupMap = buildRouteGroupMap(manifestPath);
+    return processNewStats(stats, getGzipSize, routeGroupMap);
   }
   return processStats(stats, getGzipSize);
 }
@@ -291,4 +320,4 @@ function loadRouteSizes(sizesPath) {
   return JSON.parse(fs.readFileSync(sizesPath, 'utf8'));
 }
 
-module.exports = { formatBytes, formatDiff, processStats, processNewStats, resolveStatsPath, parseStatsFile, generateReport, saveRouteSizes, loadRouteSizes };
+module.exports = { formatBytes, formatDiff, processStats, processNewStats, buildRouteGroupMap, resolveStatsPath, parseStatsFile, generateReport, saveRouteSizes, loadRouteSizes };
