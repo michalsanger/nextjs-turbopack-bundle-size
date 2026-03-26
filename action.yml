@@ -26,6 +26,10 @@ inputs:
     description: 'Percentage threshold for showing 🔴 on size increases. Increases above this percentage show 🔴, others show 🟡. Default 0 means all increases show 🔴.'
     required: false
     default: '0'
+  app-name:
+    description: 'Application name to display in the report header. If not set, a generic header is used.'
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -70,6 +74,7 @@ runs:
         ACTION_PATH: ${{ github.action_path }}
         MINIMUM_CHANGE_THRESHOLD: ${{ inputs.minimum-change-threshold }}
         BUDGET_PERCENT_INCREASE_RED: ${{ inputs.budget-percent-increase-red }}
+        APP_NAME: ${{ inputs.app-name }}
       with:
         script: |
           const path = require('path');
@@ -93,7 +98,8 @@ runs:
             baselineRoutes = {};
           }
 
-          fs.writeFileSync('bundle-report.md', generateReport(currentRoutes, baselineRoutes, threshold, budgetPercentIncreaseRed));
+          const appName = process.env.APP_NAME || '';
+          fs.writeFileSync('bundle-report.md', generateReport(currentRoutes, baselineRoutes, threshold, budgetPercentIncreaseRed, appName));
 
     - name: Post or update PR comment
       if: github.event_name == 'pull_request'
