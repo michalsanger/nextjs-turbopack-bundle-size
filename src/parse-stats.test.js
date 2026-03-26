@@ -197,6 +197,23 @@ describe('processStats', () => {
     assert.ok('/' in routes);
   });
 
+  test('does not treat route groups containing "main" as internal chunks', () => {
+    const stats = makeStats({
+      main: { assets: [{ name: 'main.js' }] },
+      '/(app)/(main)/chat/page': { assets: [{ name: 'chat.js' }] },
+      '/(app)/(main)/dashboard/page': { assets: [{ name: 'dashboard.js' }] },
+    }, [
+      { name: 'main.js', size: 1000 },
+      { name: 'chat.js', size: 2000 },
+      { name: 'dashboard.js', size: 3000 },
+    ]);
+    const routes = processStats(stats, () => 100);
+    assert.ok('global' in routes, 'main chunk should be in global');
+    assert.equal(routes['global'].gzip, 100); // only the "main" chunk
+    assert.ok('/(app)/(main)/chat' in routes, 'chat route should not be filtered');
+    assert.ok('/(app)/(main)/dashboard' in routes, 'dashboard route should not be filtered');
+  });
+
   test('handles asset as plain string (not object)', () => {
     const stats = makeStats(
       { 'app/page': { assets: ['home.js'] } },

@@ -146,7 +146,9 @@ function processStats(stats, getGzipSize = null) {
   let globalGzip = 0;
 
   for (const [routeName, chunkGroup] of Object.entries(entrypoints)) {
-    const isInternal = INTERNAL_CHUNKS.some((chunk) => routeName.includes(chunk));
+    const isInternal = INTERNAL_CHUNKS.some((chunk) =>
+      routeName === chunk || routeName.startsWith(chunk + '-') || routeName.startsWith(chunk + '.')
+    );
 
     let totalRaw = 0;
     let totalGzip = 0;
