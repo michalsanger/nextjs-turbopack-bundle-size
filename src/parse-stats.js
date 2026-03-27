@@ -207,6 +207,18 @@ function resolveStatsPath(statsPath) {
 }
 
 /**
+ * Returns the absolute path to the `.next` directory that contains the stats file.
+ *
+ * @param {string} filePath - Path to a file inside `.next` (e.g. diagnostics or server stats)
+ * @returns {string}
+ */
+function findDotNextDir(filePath) {
+  const segments = path.resolve(filePath).split(path.sep);
+  const idx = segments.lastIndexOf('.next');
+  return idx >= 0 ? segments.slice(0, idx + 1).join(path.sep) : '.next';
+}
+
+/**
  * Reads a stats file from disk and processes it.
  *
  * Automatically detects the format: if the parsed JSON is an array, it uses
@@ -222,14 +234,20 @@ function parseStatsFile(statsPath, calculateGzip) {
   if (!fs.existsSync(resolvedPath)) return {};
   const stats = JSON.parse(fs.readFileSync(resolvedPath, 'utf8'));
 
+  const dotNextDir = findDotNextDir(resolvedPath);
+
   const getGzipSize = calculateGzip
     ? (assetName) => {
-        let filePath = assetName;
-        if (!fs.existsSync(filePath) && !filePath.startsWith('.next')) {
-          filePath = path.join('.next', assetName);
-        }
+        const relativeFromDotNext =
+          assetName.startsWith('.next/') || assetName.startsWith('.next' + path.sep)
+            ? assetName.slice('.next'.length + 1)
+            : assetName;
+        const filePath = path.join(dotNextDir, relativeFromDotNext);
         if (fs.existsSync(filePath)) {
           return zlib.gzipSync(fs.readFileSync(filePath)).length;
+        }
+        if (filePath !== assetName && fs.existsSync(assetName)) {
+          return zlib.gzipSync(fs.readFileSync(assetName)).length;
         }
         console.log(`⚠️ Warning: Could not find file on disk for gzip: ${filePath}`);
         return 0;
@@ -237,7 +255,7 @@ function parseStatsFile(statsPath, calculateGzip) {
     : null;
 
   if (Array.isArray(stats)) {
-    const manifestPath = path.join(path.dirname(resolvedPath), '..', 'server', 'app-paths-manifest.json');
+    const manifestPath = path.join(dotNextDir, 'server', 'app-paths-manifest.json');
     const routeGroupMap = buildRouteGroupMap(manifestPath);
     return processNewStats(stats, getGzipSize, routeGroupMap);
   }
