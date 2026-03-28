@@ -215,7 +215,11 @@ function resolveStatsPath(statsPath) {
 function findDotNextDir(filePath) {
   const segments = path.resolve(filePath).split(path.sep);
   const idx = segments.lastIndexOf('.next');
-  return idx >= 0 ? segments.slice(0, idx + 1).join(path.sep) : '.next';
+  if (idx < 0) {
+    console.log(`⚠️ Warning: Could not find .next directory in path: ${filePath}, falling back to '.next'`);
+    return '.next';
+  }
+  return segments.slice(0, idx + 1).join(path.sep);
 }
 
 /**
@@ -245,9 +249,6 @@ function parseStatsFile(statsPath, calculateGzip) {
         const filePath = path.join(dotNextDir, relativeFromDotNext);
         if (fs.existsSync(filePath)) {
           return zlib.gzipSync(fs.readFileSync(filePath)).length;
-        }
-        if (filePath !== assetName && fs.existsSync(assetName)) {
-          return zlib.gzipSync(fs.readFileSync(assetName)).length;
         }
         console.log(`⚠️ Warning: Could not find file on disk for gzip: ${filePath}`);
         return 0;

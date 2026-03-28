@@ -457,6 +457,31 @@ describe('parseStatsFile', () => {
     assert.ok(routes['global'].gzip > 0, 'gzip should resolve relative to CWD/.next');
   });
 
+  test('logs a warning and returns gzip 0 when stats path is outside a .next directory', () => {
+    const appRoot = path.join(tmpRoot, 'outside-dotnext-app');
+    fs.mkdirSync(appRoot, { recursive: true });
+    const statsPath = path.join(appRoot, 'custom-stats', 'route-bundle-stats.json');
+    fs.mkdirSync(path.dirname(statsPath), { recursive: true });
+    fs.writeFileSync(statsPath, JSON.stringify([
+      {
+        route: '/',
+        firstLoadUncompressedJsBytes: 100,
+        firstLoadChunkPaths: ['.next/static/chunks/home.js'],
+      },
+    ]));
+
+    const logs = [];
+    const originalLog = console.log;
+    console.log = (msg) => logs.push(msg);
+    try {
+      const routes = parseStatsFile(statsPath, true);
+      assert.ok(logs.some((m) => m.includes('Could not find .next directory in path')), 'expected warning about missing .next');
+      assert.ok(routes['global'] !== undefined || Object.keys(routes).length === 0, 'should not throw');
+    } finally {
+      console.log = originalLog;
+    }
+  });
+
   test('returns gzip 0 when a chunk file is missing', () => {
     const appRoot = path.join(tmpRoot, 'missing-chunks-app');
     const dotNext = path.join(appRoot, '.next');

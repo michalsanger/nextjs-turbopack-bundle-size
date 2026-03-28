@@ -14,7 +14,7 @@ A GitHub Action that tracks Next.js App Router bundle sizes across pull requests
     app-name: My App
 ```
 
-The action must run **after** the app has been built with `TURBOPACK_STATS=1`. See [`examples/usage.yml`](examples/usage.yml) for a complete workflow.
+The action must run **after** the app has been built with `TURBOPACK_STATS=1`. See [`examples/usage.yml`](examples/usage.yml) for a complete single-app workflow, or [`examples/monorepo.yml`](examples/monorepo.yml) for a matrix workflow covering multiple apps in a monorepo.
 
 ## Example PR Comment
 
