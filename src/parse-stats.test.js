@@ -1,8 +1,10 @@
 'use strict';
 
-const { describe, test } = require('node:test');
+const { describe, test, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { formatBytes, formatDiff, processStats, processNewStats, buildRouteGroupMap, generateReport } = require('./parse-stats.js');
+const fs = require('fs');
+const path = require('path');
+const { formatBytes, formatDiff, processStats, processNewStats, buildRouteGroupMap, generateReport, parseStatsFile } = require('./parse-stats.js');
 
 // ---------------------------------------------------------------------------
 // formatBytes
@@ -357,11 +359,191 @@ describe('processNewStats', () => {
 });
 
 // ---------------------------------------------------------------------------
-// buildRouteGroupMap
+// parseStatsFile — gzip resolution when CWD is not the app directory
 // ---------------------------------------------------------------------------
 
-const fs = require('fs');
-const path = require('path');
+describe('parseStatsFile', () => {
+  const tmpRoot = path.join(process.env.TMPDIR || '/tmp', `parse-stats-file-${process.pid}`);
+  const originalCwd = process.cwd();
+
+  afterEach(() => {
+    process.chdir(originalCwd);
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  test('resolves chunk paths from stats file location (new format, .next/ prefix)', () => {
+    const appRoot = path.join(tmpRoot, 'apps', 'my-app');
+    const dotNext = path.join(appRoot, '.next');
+    const chunksDir = path.join(dotNext, 'static', 'chunks');
+    fs.mkdirSync(chunksDir, { recursive: true });
+    fs.writeFileSync(path.join(chunksDir, 'shared.js'), '// shared');
+    fs.writeFileSync(path.join(chunksDir, 'home.js'), '// home');
+    fs.writeFileSync(path.join(chunksDir, 'about.js'), '// about');
+
+    const statsPath = path.join(dotNext, 'diagnostics', 'route-bundle-stats.json');
+    fs.mkdirSync(path.dirname(statsPath), { recursive: true });
+    fs.writeFileSync(
+      statsPath,
+      JSON.stringify([
+        {
+          route: '/',
+          firstLoadUncompressedJsBytes: 100,
+          firstLoadChunkPaths: ['.next/static/chunks/shared.js', '.next/static/chunks/home.js'],
+        },
+        {
+          route: '/about',
+          firstLoadUncompressedJsBytes: 100,
+          firstLoadChunkPaths: ['.next/static/chunks/shared.js', '.next/static/chunks/about.js'],
+        },
+      ]),
+    );
+
+    process.chdir(tmpRoot);
+    const routes = parseStatsFile(statsPath, true);
+    assert.ok(routes['global'], 'expected global from shared chunks');
+    assert.ok(routes['global'].gzip > 0, 'global gzip should be computed from disk');
+    assert.ok(routes['/'], 'expected / route');
+    assert.ok(routes['/'].gzip > 0, 'route gzip should be computed from disk');
+    assert.ok(routes['/about'], 'expected /about route');
+    assert.ok(routes['/about'].gzip > 0, 'route gzip should be computed from disk');
+  });
+
+  test('resolves chunk paths from stats file location (legacy format, bare paths)', () => {
+    const appRoot = path.join(tmpRoot, 'legacy-app');
+    const dotNext = path.join(appRoot, '.next');
+    const chunksDir = path.join(dotNext, 'static', 'chunks');
+    fs.mkdirSync(chunksDir, { recursive: true });
+    fs.writeFileSync(path.join(chunksDir, 'page.js'), '// page chunk');
+
+    const statsPath = path.join(dotNext, 'server', 'webpack-stats.json');
+    fs.mkdirSync(path.dirname(statsPath), { recursive: true });
+    fs.writeFileSync(statsPath, JSON.stringify({
+      assets: [{ name: 'static/chunks/page.js', size: 100 }],
+      namedChunkGroups: {
+        'app/page': { assets: [{ name: 'static/chunks/page.js' }] },
+      },
+    }));
+
+    process.chdir(tmpRoot);
+    const routes = parseStatsFile(statsPath, true);
+    assert.ok(routes['/'], 'expected / route');
+    assert.ok(routes['/'].gzip > 0, 'gzip should be computed from disk using dotNextDir');
+  });
+
+  test('works when CWD is the app directory (single-app / default-path backwards compat)', () => {
+    const appRoot = path.join(tmpRoot, 'single-app');
+    const dotNext = path.join(appRoot, '.next');
+    const chunksDir = path.join(dotNext, 'static', 'chunks');
+    fs.mkdirSync(chunksDir, { recursive: true });
+    fs.writeFileSync(path.join(chunksDir, 'shared.js'), '// shared');
+    fs.writeFileSync(path.join(chunksDir, 'home.js'), '// home');
+
+    const statsPath = path.join(dotNext, 'diagnostics', 'route-bundle-stats.json');
+    fs.mkdirSync(path.dirname(statsPath), { recursive: true });
+    fs.writeFileSync(
+      statsPath,
+      JSON.stringify([
+        {
+          route: '/',
+          firstLoadUncompressedJsBytes: 100,
+          firstLoadChunkPaths: ['.next/static/chunks/shared.js', '.next/static/chunks/home.js'],
+        },
+      ]),
+    );
+
+    process.chdir(appRoot);
+    const routes = parseStatsFile('.next/diagnostics/route-bundle-stats.json', true);
+    assert.ok(routes['global'], 'expected global entry');
+    assert.ok(routes['global'].gzip > 0, 'gzip should resolve relative to CWD/.next');
+  });
+
+  test('logs a warning and returns gzip 0 when stats path is outside a .next directory', () => {
+    const appRoot = path.join(tmpRoot, 'outside-dotnext-app');
+    fs.mkdirSync(appRoot, { recursive: true });
+    const statsPath = path.join(appRoot, 'custom-stats', 'route-bundle-stats.json');
+    fs.mkdirSync(path.dirname(statsPath), { recursive: true });
+    fs.writeFileSync(statsPath, JSON.stringify([
+      {
+        route: '/',
+        firstLoadUncompressedJsBytes: 100,
+        firstLoadChunkPaths: ['.next/static/chunks/home.js'],
+      },
+    ]));
+
+    const logs = [];
+    const originalLog = console.log;
+    console.log = (msg) => logs.push(msg);
+    try {
+      const routes = parseStatsFile(statsPath, true);
+      assert.ok(logs.some((m) => m.includes('Could not find .next directory in path')), 'expected warning about missing .next');
+      assert.ok(routes['global'] !== undefined || Object.keys(routes).length === 0, 'should not throw');
+    } finally {
+      console.log = originalLog;
+    }
+  });
+
+  test('returns gzip 0 when a chunk file is missing', () => {
+    const appRoot = path.join(tmpRoot, 'missing-chunks-app');
+    const dotNext = path.join(appRoot, '.next');
+    const statsPath = path.join(dotNext, 'server', 'webpack-stats.json');
+    fs.mkdirSync(path.dirname(statsPath), { recursive: true });
+    fs.writeFileSync(statsPath, JSON.stringify({
+      assets: [{ name: 'static/chunks/missing.js', size: 100 }],
+      namedChunkGroups: {
+        'app/page': { assets: [{ name: 'static/chunks/missing.js' }] },
+      },
+    }));
+
+    const routes = parseStatsFile(statsPath, true);
+    assert.ok(routes['/'], 'expected / route');
+    assert.equal(routes['/'].gzip, 0);
+  });
+
+  test('resolves app-paths-manifest.json via dotNextDir for route group mapping', () => {
+    const appRoot = path.join(tmpRoot, 'manifest-app');
+    const dotNext = path.join(appRoot, '.next');
+    const chunksDir = path.join(dotNext, 'static', 'chunks');
+    fs.mkdirSync(chunksDir, { recursive: true });
+    fs.writeFileSync(path.join(chunksDir, 'shared.js'), '// shared');
+    fs.writeFileSync(path.join(chunksDir, 'book.js'), '// book');
+
+    const manifestDir = path.join(dotNext, 'server');
+    fs.mkdirSync(manifestDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(manifestDir, 'app-paths-manifest.json'),
+      JSON.stringify({
+        '/(frontend)/book-session/[hash]/page': 'app/(frontend)/book-session/[hash]/page.js',
+      }),
+    );
+
+    const statsPath = path.join(dotNext, 'diagnostics', 'route-bundle-stats.json');
+    fs.mkdirSync(path.dirname(statsPath), { recursive: true });
+    fs.writeFileSync(
+      statsPath,
+      JSON.stringify([
+        {
+          route: '/',
+          firstLoadUncompressedJsBytes: 100,
+          firstLoadChunkPaths: ['.next/static/chunks/shared.js'],
+        },
+        {
+          route: '/book-session/[hash]',
+          firstLoadUncompressedJsBytes: 100,
+          firstLoadChunkPaths: ['.next/static/chunks/shared.js', '.next/static/chunks/book.js'],
+        },
+      ]),
+    );
+
+    process.chdir(tmpRoot);
+    const routes = parseStatsFile(statsPath, true);
+    assert.ok('/(frontend)/book-session/[hash]' in routes, 'route group prefix should be restored from manifest');
+    assert.ok(!('/book-session/[hash]' in routes), 'bare route should be replaced by route-group-prefixed key');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildRouteGroupMap
+// ---------------------------------------------------------------------------
 
 describe('buildRouteGroupMap', () => {
   const tmpDir = path.join(process.env.TMPDIR || '/tmp', 'parse-stats-test');

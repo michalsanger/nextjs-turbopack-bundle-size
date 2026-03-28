@@ -1,0 +1,45 @@
+name: "Next.js Bundle Analysis (Monorepo)"
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  analyze-bundle:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
+
+    strategy:
+      matrix:
+        app:
+          - name: web
+            path: apps/web
+          - name: docs
+            path: apps/docs
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - run: npm ci
+
+      - run: TURBOPACK_STATS=1 npm run build
+        working-directory: ${{ matrix.app.path }}
+
+      - uses: michalsanger/nextjs-turbopack-bundle-size@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          stats-path: ${{ matrix.app.path }}/.next/diagnostics/route-bundle-stats.json
+          artifact-name: turbopack-${{ matrix.app.name }}-stats
+          app-name: ${{ matrix.app.name }}
+          minimum-change-threshold: 256
+          budget-percent-increase-red: 20

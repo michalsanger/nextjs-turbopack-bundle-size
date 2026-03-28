@@ -14,7 +14,7 @@ A GitHub Action that tracks Next.js App Router bundle sizes across pull requests
     app-name: My App
 ```
 
-The action must run **after** the app has been built with `TURBOPACK_STATS=1`. See [`examples/usage.yml`](examples/usage.yml) for a complete workflow.
+The action must run **after** the app has been built with `TURBOPACK_STATS=1`. See [`examples/usage.yml`](examples/usage.yml) for a complete single-app workflow, or [`examples/monorepo.yml`](examples/monorepo.yml) for a matrix workflow covering multiple apps in a monorepo.
 
 ## Example PR Comment
 
@@ -39,11 +39,11 @@ The action posts a comment like this on every pull request:
 | Input | Required | Default | Description |
 |---|---|---|---|
 | `github-token` | Yes | — | GitHub token for downloading baseline artifact and posting PR comments |
-| `stats-path` | No | `.next/diagnostics/route-bundle-stats.json` | Path to the Turbopack stats file. Auto-detects legacy path `.next/server/webpack-stats.json` if the default doesn't exist. |
+| `stats-path` | No | `.next/diagnostics/route-bundle-stats.json` | Path to the Turbopack stats file. Auto-detects legacy path `.next/server/webpack-stats.json` if the default doesn't exist. Chunk files and the app-paths manifest are resolved relative to the `.next` directory inferred from this path, so pointing it to a subdirectory (e.g. `apps/my-app/.next/diagnostics/route-bundle-stats.json`) works correctly without any additional configuration. |
 | `artifact-name` | No | `turbopack-main-stats` | Artifact name for storing the baseline stats |
 | `minimum-change-threshold` | No | `0` | Byte threshold below which a size change is considered unchanged. For example, `500` means changes of 500 B or less are shown as "➖ No change". |
 | `budget-percent-increase-red` | No | `0` | Percentage threshold for flagging size increases as critical. Increases above this percentage show 🔴, others show 🟡. Default `0` means all increases show 🔴. For example, `20` means only increases above 20% are flagged red. |
-| `app-name` | No | — | Application name to display in the report header. For example, `My App` produces "📦 My App — App Router Sizes (Turbopack)". If not set, a generic header is used. |
+| `app-name` | No | — | Application name in the report header (e.g. `My App` → "📦 My App — App Router Sizes (Turbopack)"). When set, the sticky PR comment uses `bundle-size-report-{name}` so matrix jobs for multiple apps do not overwrite each other. If not set, a generic header and the default comment key `bundle-size-report` are used. |
 
 ## Required Permissions
 
@@ -56,8 +56,8 @@ permissions:
 
 ## How It Works
 
-- **On push to the default branch** (auto-detected): uploads `.next/server/webpack-stats.json` as a GitHub Actions artifact (the baseline).
-- **On pull request**: downloads the baseline artifact, parses both stat files, calculates gzip sizes for each route, and posts (or updates) a sticky comment with a comparison table.
+- **On push to the default branch** (auto-detected): parses the stats file, computes gzip sizes for each route, and uploads the result as a GitHub Actions artifact (the baseline).
+- **On pull request**: downloads the baseline artifact, parses the current stats file, calculates gzip sizes, and posts (or updates) a sticky comment with a route-by-route comparison table.
 
 The first PR before any baseline exists will show all routes as "🆕 New" — this is expected.
 
