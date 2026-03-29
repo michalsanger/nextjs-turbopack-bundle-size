@@ -220,7 +220,7 @@ function findDotNextDir(filePath) {
     console.log(
       `⚠️ Warning: Could not find .next directory in path: ${filePath}, falling back to '.next'`,
     );
-    return ".next";
+    return path.resolve(".next");
   }
   return segments.slice(0, idx + 1).join(path.sep);
 }
