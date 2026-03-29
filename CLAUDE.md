@@ -31,9 +31,11 @@ npm test   # run unit tests (no install needed — uses Node built-in test runne
 The action runs two distinct phases based on GitHub context, both within a single `action.yml`:
 
 **On push to the base branch** (`if: github.ref == format('refs/heads/{0}', inputs.base-branch)`):
+
 - Uploads `.next/server/webpack-stats.json` as artifact `turbopack-main-stats`
 
 **On pull request** (`if: github.event_name == 'pull_request'`):
+
 1. Downloads the baseline artifact from the base branch via `dawidd6/action-download-artifact` (uses this community action because the standard `actions/download-artifact` cannot cross branches; `continue-on-error: true` handles the first-ever PR gracefully)
 2. Runs inline JavaScript via `actions/github-script` to parse both stat files, calculate gzip sizes, compute diffs
 3. Posts/updates a sticky PR comment via `marocchino/sticky-pull-request-comment`
@@ -59,9 +61,9 @@ The baseline stats are downloaded to `_bundle-baseline-stats/` in the workspace.
 
 ## Inputs
 
-| Input | Default | Purpose |
-|---|---|---|
-| `github-token` | required | Artifact download + PR comment |
-| `stats-path` | `.next/diagnostics/route-bundle-stats.json` | Override if build output differs; auto-detects legacy path |
-| `artifact-name` | `turbopack-main-stats` | Override to avoid name collisions |
-| `budget-percent-increase-red` | `0` | % threshold; increases above show 🔴, below show 🟡 |
+| Input                         | Default                                     | Purpose                                                    |
+| ----------------------------- | ------------------------------------------- | ---------------------------------------------------------- |
+| `github-token`                | required                                    | Artifact download + PR comment                             |
+| `stats-path`                  | `.next/diagnostics/route-bundle-stats.json` | Override if build output differs; auto-detects legacy path |
+| `artifact-name`               | `turbopack-main-stats`                      | Override to avoid name collisions                          |
+| `budget-percent-increase-red` | `0`                                         | % threshold; increases above show 🔴, below show 🟡        |

@@ -1,38 +1,36 @@
-'use strict';
+"use strict";
 
-const fs = require('fs');
-const path = require('path');
-const zlib = require('zlib');
+const fs = require("fs");
+const path = require("path");
+const zlib = require("zlib");
 
 const INTERNAL_CHUNKS = [
-  'webpack',
-  'main-app',
-  'main',
-  'polyfills',
-  'react-refresh',
-  'edge-wrapper',
+  "webpack",
+  "main-app",
+  "main",
+  "polyfills",
+  "react-refresh",
+  "edge-wrapper",
 ];
 
 function formatBytes(bytes) {
-  if (bytes === 0) return '0 B';
+  if (bytes === 0) return "0 B";
   const k = 1024;
-  const sizes = ['B', 'KB', 'MB'];
+  const sizes = ["B", "KB", "MB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
 function formatDiff(current, baseline, threshold = 0, budgetPercentIncreaseRed = 0) {
-  if (baseline === undefined) return '🆕 New';
+  if (baseline === undefined) return "🆕 New";
   const diff = current - baseline;
-  if (Math.abs(diff) <= threshold) return '➖ No change';
+  if (Math.abs(diff) <= threshold) return "➖ No change";
   if (baseline === 0) {
-    return diff > 0
-      ? `🔴 \`+${formatBytes(diff)}\``
-      : `🟢 \`-${formatBytes(Math.abs(diff))}\``;
+    return diff > 0 ? `🔴 \`+${formatBytes(diff)}\`` : `🟢 \`-${formatBytes(Math.abs(diff))}\``;
   }
   const percent = (Math.abs(diff) / baseline) * 100;
   if (diff > 0) {
-    const icon = percent > budgetPercentIncreaseRed ? '🔴' : '🟡';
+    const icon = percent > budgetPercentIncreaseRed ? "🔴" : "🟡";
     return `${icon} \`+${formatBytes(diff)}\``;
   }
   return `🟢 \`-${formatBytes(Math.abs(diff))}\``;
@@ -49,16 +47,16 @@ function formatDiff(current, baseline, threshold = 0, budgetPercentIncreaseRed =
  */
 function buildRouteGroupMap(manifestPath) {
   if (!fs.existsSync(manifestPath)) return {};
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
   const map = {};
   for (const key of Object.keys(manifest)) {
     // Only process page routes (not API routes)
-    if (!key.endsWith('/page')) continue;
+    if (!key.endsWith("/page")) continue;
     // Skip keys that have no route groups
     if (!/\/\([^)]+\)/.test(key)) continue;
-    let cleanRoute = key.replace(/\/\([^)]+\)/g, '').replace(/\/page$/, '');
-    cleanRoute = cleanRoute === '' ? '/' : cleanRoute;
-    map[cleanRoute] = key.replace(/\/page$/, '');
+    let cleanRoute = key.replace(/\/\([^)]+\)/g, "").replace(/\/page$/, "");
+    cleanRoute = cleanRoute === "" ? "/" : cleanRoute;
+    map[cleanRoute] = key.replace(/\/page$/, "");
   }
   return map;
 }
@@ -80,7 +78,7 @@ function processNewStats(stats, getGzipSize = null, routeGroupMap = {}) {
 
   // Find JS chunks shared by ALL routes
   const allChunkSets = stats.map(
-    (r) => new Set((r.firstLoadChunkPaths || []).filter((c) => c.endsWith('.js'))),
+    (r) => new Set((r.firstLoadChunkPaths || []).filter((c) => c.endsWith(".js"))),
   );
   const sharedChunks = new Set(
     [...allChunkSets[0]].filter((chunk) => allChunkSets.every((s) => s.has(chunk))),
@@ -97,7 +95,7 @@ function processNewStats(stats, getGzipSize = null, routeGroupMap = {}) {
   const routes = {};
 
   if (globalGzip > 0) {
-    routes['global'] = { gzip: globalGzip };
+    routes["global"] = { gzip: globalGzip };
   }
 
   for (const entry of stats) {
@@ -110,7 +108,7 @@ function processNewStats(stats, getGzipSize = null, routeGroupMap = {}) {
     let routeGzip = 0;
     if (getGzipSize) {
       for (const chunk of entry.firstLoadChunkPaths || []) {
-        if (!chunk.endsWith('.js')) continue;
+        if (!chunk.endsWith(".js")) continue;
         if (sharedChunks.has(chunk)) continue;
         routeGzip += getGzipSize(chunk);
       }
@@ -146,16 +144,19 @@ function processStats(stats, getGzipSize = null) {
   let globalGzip = 0;
 
   for (const [routeName, chunkGroup] of Object.entries(entrypoints)) {
-    const isInternal = INTERNAL_CHUNKS.some((chunk) =>
-      routeName === chunk || routeName.startsWith(chunk + '-') || routeName.startsWith(chunk + '.')
+    const isInternal = INTERNAL_CHUNKS.some(
+      (chunk) =>
+        routeName === chunk ||
+        routeName.startsWith(chunk + "-") ||
+        routeName.startsWith(chunk + "."),
     );
 
     let totalRaw = 0;
     let totalGzip = 0;
 
     (chunkGroup.assets || []).forEach((asset) => {
-      const assetName = typeof asset === 'string' ? asset : asset.name;
-      if (!assetName.endsWith('.js')) return;
+      const assetName = typeof asset === "string" ? asset : asset.name;
+      if (!assetName.endsWith(".js")) return;
 
       totalRaw += assetSizes[assetName] || 0;
       if (getGzipSize) totalGzip += getGzipSize(assetName);
@@ -169,21 +170,21 @@ function processStats(stats, getGzipSize = null) {
 
     if (totalRaw === 0) continue;
 
-    let cleanRoute = routeName.replace(/^app/, '').replace(/\/page$/, '');
-    cleanRoute = cleanRoute === '' ? '/' : cleanRoute;
+    let cleanRoute = routeName.replace(/^app/, "").replace(/\/page$/, "");
+    cleanRoute = cleanRoute === "" ? "/" : cleanRoute;
     routes[cleanRoute] = { gzip: totalGzip };
   }
 
   if (globalRaw > 0) {
-    routes['global'] = { gzip: globalGzip };
+    routes["global"] = { gzip: globalGzip };
   }
 
   return routes;
 }
 
 const KNOWN_STATS_PATHS = [
-  '.next/diagnostics/route-bundle-stats.json',
-  '.next/server/webpack-stats.json',
+  ".next/diagnostics/route-bundle-stats.json",
+  ".next/server/webpack-stats.json",
 ];
 
 /**
@@ -214,10 +215,12 @@ function resolveStatsPath(statsPath) {
  */
 function findDotNextDir(filePath) {
   const segments = path.resolve(filePath).split(path.sep);
-  const idx = segments.lastIndexOf('.next');
+  const idx = segments.lastIndexOf(".next");
   if (idx < 0) {
-    console.log(`⚠️ Warning: Could not find .next directory in path: ${filePath}, falling back to '.next'`);
-    return '.next';
+    console.log(
+      `⚠️ Warning: Could not find .next directory in path: ${filePath}, falling back to '.next'`,
+    );
+    return ".next";
   }
   return segments.slice(0, idx + 1).join(path.sep);
 }
@@ -236,15 +239,15 @@ function findDotNextDir(filePath) {
 function parseStatsFile(statsPath, calculateGzip) {
   const resolvedPath = resolveStatsPath(statsPath);
   if (!fs.existsSync(resolvedPath)) return {};
-  const stats = JSON.parse(fs.readFileSync(resolvedPath, 'utf8'));
+  const stats = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
 
   const dotNextDir = findDotNextDir(resolvedPath);
 
   const getGzipSize = calculateGzip
     ? (assetName) => {
         const relativeFromDotNext =
-          assetName.startsWith('.next/') || assetName.startsWith('.next' + path.sep)
-            ? assetName.slice('.next'.length + 1)
+          assetName.startsWith(".next/") || assetName.startsWith(".next" + path.sep)
+            ? assetName.slice(".next".length + 1)
             : assetName;
         const filePath = path.join(dotNextDir, relativeFromDotNext);
         if (fs.existsSync(filePath)) {
@@ -256,7 +259,7 @@ function parseStatsFile(statsPath, calculateGzip) {
     : null;
 
   if (Array.isArray(stats)) {
-    const manifestPath = path.join(dotNextDir, 'server', 'app-paths-manifest.json');
+    const manifestPath = path.join(dotNextDir, "server", "app-paths-manifest.json");
     const routeGroupMap = buildRouteGroupMap(manifestPath);
     return processNewStats(stats, getGzipSize, routeGroupMap);
   }
@@ -271,54 +274,64 @@ function parseStatsFile(statsPath, calculateGzip) {
  * @param {number} threshold
  * @returns {string}
  */
-function generateReport(currentRoutes, baselineRoutes, threshold = 0, budgetPercentIncreaseRed = 0, appName = '') {
+function generateReport(
+  currentRoutes,
+  baselineRoutes,
+  threshold = 0,
+  budgetPercentIncreaseRed = 0,
+  appName = "",
+) {
   const title = appName
     ? `## 📦 ${appName} — App Router Sizes (Turbopack)`
-    : '## 📦 Next.js App Router Sizes (Turbopack)';
+    : "## 📦 Next.js App Router Sizes (Turbopack)";
   let markdown = `${title}\n\nThis analysis was generated by the [Next.js Turbopack Bundle Size action](https://github.com/michalsanger/nextjs-turbopack-bundle-size). 🤖\n\n`;
 
-  const allRoutes = [...new Set([...Object.keys(currentRoutes), ...Object.keys(baselineRoutes)])].sort((a, b) => {
-    if (a === 'global') return -1;
-    if (b === 'global') return 1;
+  const allRoutes = [
+    ...new Set([...Object.keys(currentRoutes), ...Object.keys(baselineRoutes)]),
+  ].sort((a, b) => {
+    if (a === "global") return -1;
+    if (b === "global") return 1;
     return a.localeCompare(b);
   });
 
   if (allRoutes.length === 0) {
     markdown +=
-      '> ⚠️ **Warning:** No routes identified. Ensure `TURBOPACK_STATS=1` is set during build.\n';
+      "> ⚠️ **Warning:** No routes identified. Ensure `TURBOPACK_STATS=1` is set during build.\n";
     return markdown;
   }
 
-  const currentGlobal = (currentRoutes['global'] || {}).gzip || 0;
-  const baselineGlobal = (baselineRoutes['global'] || {}).gzip || 0;
+  const currentGlobal = (currentRoutes["global"] || {}).gzip || 0;
+  const baselineGlobal = (baselineRoutes["global"] || {}).gzip || 0;
 
   const changedRows = [];
   for (const route of allRoutes) {
     const current = currentRoutes[route];
     const baseline = baselineRoutes[route];
-    const isGlobal = route === 'global';
+    const isGlobal = route === "global";
 
     if (current && baseline === undefined) {
-      const firstLoad = isGlobal ? ' — |' : ` \`${formatBytes(current.gzip + currentGlobal)}\` |`;
+      const firstLoad = isGlobal ? " — |" : ` \`${formatBytes(current.gzip + currentGlobal)}\` |`;
       changedRows.push(`| \`${route}\` | \`${formatBytes(current.gzip)}\` |${firstLoad} 🆕 New |`);
     } else if (current === undefined && baseline) {
       changedRows.push(`| \`${route}\` | — | — | 🗑️ Removed |`);
     } else if (current && baseline) {
       const diff = Math.abs(current.gzip - baseline.gzip);
       if (diff > threshold) {
-        const firstLoad = isGlobal ? ' — |' : ` \`${formatBytes(current.gzip + currentGlobal)}\` |`;
-        changedRows.push(`| \`${route}\` | \`${formatBytes(current.gzip)}\` |${firstLoad} ${formatDiff(current.gzip, baseline.gzip, threshold, budgetPercentIncreaseRed)} |`);
+        const firstLoad = isGlobal ? " — |" : ` \`${formatBytes(current.gzip + currentGlobal)}\` |`;
+        changedRows.push(
+          `| \`${route}\` | \`${formatBytes(current.gzip)}\` |${firstLoad} ${formatDiff(current.gzip, baseline.gzip, threshold, budgetPercentIncreaseRed)} |`,
+        );
       }
     }
   }
 
   if (changedRows.length === 0) {
-    markdown += 'This PR introduced no changes to the JavaScript bundle! 🙌\n';
+    markdown += "This PR introduced no changes to the JavaScript bundle! 🙌\n";
     return markdown;
   }
 
-  markdown += '| Route | Size (gzipped) | First load | Diff (vs baseline) |\n|---|---|---|---|\n';
-  markdown += changedRows.join('\n') + '\n';
+  markdown += "| Route | Size (gzipped) | First load | Diff (vs baseline) |\n|---|---|---|---|\n";
+  markdown += changedRows.join("\n") + "\n";
 
   return markdown;
 }
@@ -343,7 +356,18 @@ function saveRouteSizes(statsPath, outputPath) {
  */
 function loadRouteSizes(sizesPath) {
   if (!fs.existsSync(sizesPath)) return {};
-  return JSON.parse(fs.readFileSync(sizesPath, 'utf8'));
+  return JSON.parse(fs.readFileSync(sizesPath, "utf8"));
 }
 
-module.exports = { formatBytes, formatDiff, processStats, processNewStats, buildRouteGroupMap, resolveStatsPath, parseStatsFile, generateReport, saveRouteSizes, loadRouteSizes };
+module.exports = {
+  formatBytes,
+  formatDiff,
+  processStats,
+  processNewStats,
+  buildRouteGroupMap,
+  resolveStatsPath,
+  parseStatsFile,
+  generateReport,
+  saveRouteSizes,
+  loadRouteSizes,
+};
