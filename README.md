@@ -61,6 +61,14 @@ permissions:
 
 Chunk files and the app-paths manifest are resolved relative to the `.next` directory inferred from `stats-path`, so pointing it to a subdirectory (e.g. `apps/my-app/.next/diagnostics/route-bundle-stats.json`) works correctly without any additional configuration. See [`examples/monorepo.yml`](examples/monorepo.yml) for a complete monorepo setup.
 
+### Working directory in monorepos
+
+> **Note:** If your workflow uses `defaults.run.working-directory` to set a subdirectory (e.g. `my-app`), be aware that this only applies to `run:` steps — it does **not** apply to `uses:` steps like this action. You must include the subdirectory in `stats-path`:
+>
+> ```yaml
+> stats-path: my-app/.next/diagnostics/route-bundle-stats.json
+> ```
+
 The first PR before any baseline exists will show all routes as "🆕 New" — this is expected.
 
 ## Acknowledgements
