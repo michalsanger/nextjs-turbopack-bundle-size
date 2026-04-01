@@ -1,6 +1,6 @@
 # Next.js Turbopack Bundle Size
 
-A GitHub Action that tracks Next.js App Router bundle sizes across pull requests. It stores a baseline on the repository's default branch and posts a route-by-route size comparison comment on every PR.
+A GitHub Action that tracks Next.js App Router bundle sizes across pull requests. It stores a baseline for each branch and posts a route-by-route size comparison comment on every PR.
 
 ## Usage
 
@@ -40,7 +40,7 @@ The action posts a comment like this on every pull request:
 | ----------------------------- | -------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `github-token`                | Yes      | —                                           | GitHub token for downloading baseline artifact and posting PR comments                                                                                                                                                                                                                                                     |
 | `stats-path`                  | No       | `.next/diagnostics/route-bundle-stats.json` | Path to the Turbopack stats file. Auto-detects legacy path `.next/server/webpack-stats.json` if the default doesn't exist.                                                                                                                                                                                                 |
-| `artifact-name`               | No       | `turbopack-main-stats`                      | Artifact name for storing the baseline stats                                                                                                                                                                                                                                                                               |
+| `artifact-name`               | No       | `turbopack-main-stats`                      | Artifact name prefix for storing baseline stats. The branch name is appended automatically (e.g. `turbopack-main-stats-main`).                                                                                                                                                                                             |
 | `minimum-change-threshold`    | No       | `0`                                         | Byte threshold below which a size change is considered unchanged. For example, `500` means changes of 500 B or less are shown as "➖ No change".                                                                                                                                                                           |
 | `budget-percent-increase-red` | No       | `0`                                         | Percentage threshold for flagging size increases as critical. Increases above this percentage show 🔴, others show 🟡. Default `0` means all increases show 🔴. For example, `20` means only increases above 20% are flagged red.                                                                                          |
 | `app-name`                    | No       | —                                           | Application name in the report header (e.g. `My App` → "📦 My App — App Router Sizes (Turbopack)"). When set, the sticky PR comment uses `bundle-size-report-{name}` so matrix jobs for multiple apps do not overwrite each other. If not set, a generic header and the default comment key `bundle-size-report` are used. |
@@ -56,8 +56,8 @@ permissions:
 
 ## How It Works
 
-- **On push to the default branch** (auto-detected): parses the stats file, computes gzip sizes for each route, and uploads the result as a GitHub Actions artifact (the baseline).
-- **On pull request**: downloads the baseline artifact, parses the current stats file, calculates gzip sizes, and posts (or updates) a sticky comment with a route-by-route comparison table.
+- **On push to any branch**: parses the stats file, computes gzip sizes for each route, and uploads the result as a GitHub Actions artifact (per branch).
+- **On pull request**: downloads the baseline artifact from the PR's target branch, parses the current stats file, calculates gzip sizes, and posts (or updates) a sticky comment with a route-by-route comparison table.
 
 Chunk files and the app-paths manifest are resolved relative to the `.next` directory inferred from `stats-path`, so pointing it to a subdirectory (e.g. `apps/my-app/.next/diagnostics/route-bundle-stats.json`) works correctly without any additional configuration. See [`examples/monorepo.yml`](examples/monorepo.yml) for a complete monorepo setup.
 
