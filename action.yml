@@ -58,7 +58,7 @@ runs:
 
     - name: Download baseline stats
       if: github.event_name == 'pull_request'
-      uses: dawidd6/action-download-artifact@v19
+      uses: dawidd6/action-download-artifact@v20
       continue-on-error: true
       with:
         github_token: ${{ inputs.github-token }}
