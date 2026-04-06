@@ -103,7 +103,7 @@ runs:
 
     - name: Post or update PR comment
       if: github.event_name == 'pull_request'
-      uses: marocchino/sticky-pull-request-comment@v3.0.2
+      uses: marocchino/sticky-pull-request-comment@v3.0.3
       with:
         header: ${{ inputs.app-name != '' && format('bundle-size-report-{0}', inputs.app-name) || 'bundle-size-report' }}
         path: bundle-report.md
