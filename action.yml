@@ -15,7 +15,7 @@ inputs:
     required: false
     default: ".next/diagnostics/route-bundle-stats.json"
   artifact-name:
-    description: "Artifact name used to store and retrieve the baseline stats from the main branch"
+    description: "Artifact name prefix used to store and retrieve the baseline stats. The branch name is appended automatically (e.g. turbopack-main-stats-main)."
     required: false
     default: "turbopack-main-stats"
   minimum-change-threshold:
@@ -35,7 +35,7 @@ runs:
   using: composite
   steps:
     - name: Compute baseline route sizes
-      if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      if: github.event_name == 'push'
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
         STATS_PATH: ${{ inputs.stats-path }}
@@ -49,15 +49,26 @@ runs:
           saveRouteSizes(process.env.STATS_PATH, 'bundle-route-sizes.json');
 
     - name: Upload baseline stats
-      if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      if: github.event_name == 'push'
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
-        name: ${{ inputs.artifact-name }}
+        name: ${{ inputs.artifact-name }}-${{ github.ref_name }}
         path: bundle-route-sizes.json
         overwrite: true
 
     - name: Download baseline stats
+      id: download-baseline
       if: github.event_name == 'pull_request'
+      uses: dawidd6/action-download-artifact@8305c0f1062bb0d184d09ef4493ecb9288447732 # v20
+      continue-on-error: true
+      with:
+        github_token: ${{ inputs.github-token }}
+        branch: ${{ github.event.pull_request.base.ref }}
+        name: ${{ inputs.artifact-name }}-${{ github.event.pull_request.base.ref }}
+        path: _bundle-baseline-stats
+
+    - name: Download baseline stats (legacy fallback)
+      if: github.event_name == 'pull_request' && steps.download-baseline.outcome == 'failure'
       uses: dawidd6/action-download-artifact@8305c0f1062bb0d184d09ef4493ecb9288447732 # v20
       continue-on-error: true
       with:
