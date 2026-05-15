@@ -31,7 +31,7 @@ inputs:
     required: false
     default: ""
   baseline-workflow:
-    description: "Workflow file name (e.g. deploy.yml) to look up the baseline artifact in. Useful when the baseline is produced by a different workflow than the one running this action. When unset, the artifact is searched in the current workflow."
+    description: "Workflow file name (e.g. main.yml) to look up the baseline artifact in. Useful when the baseline is produced by a different workflow than the one running this action. When unset, the artifact is searched in the current workflow."
     required: false
     default: ""
 
