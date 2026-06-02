@@ -13,6 +13,22 @@ const INTERNAL_CHUNKS = [
   "edge-wrapper",
 ];
 
+/**
+ * Sanitizes a git ref so it can be appended to a GitHub Actions artifact name.
+ *
+ * `actions/upload-artifact` forbids the characters `" : < > | * ? \ /` (and
+ * control chars) in artifact names, but branch names routinely contain `/`
+ * (e.g. `feat/x`, `dependabot/...`). Anything outside `[A-Za-z0-9._-]` is
+ * replaced with `-`. The same transform must be applied wherever the name is
+ * built (upload and download) so the names always match.
+ *
+ * @param {string} ref - Branch name / git ref
+ * @returns {string}
+ */
+function slugifyBranch(ref) {
+  return String(ref).replace(/[^A-Za-z0-9._-]/g, "-");
+}
+
 function formatBytes(bytes) {
   if (bytes === 0) return "0 B";
   const k = 1024;
@@ -239,7 +255,14 @@ function findDotNextDir(filePath) {
 function parseStatsFile(statsPath, calculateGzip) {
   const resolvedPath = resolveStatsPath(statsPath);
   if (!fs.existsSync(resolvedPath)) return {};
-  const stats = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
+
+  let stats;
+  try {
+    stats = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
+  } catch (err) {
+    console.log(`⚠️ Warning: Could not parse stats file at ${resolvedPath}: ${err.message}`);
+    return {};
+  }
 
   const dotNextDir = findDotNextDir(resolvedPath);
 
@@ -360,6 +383,7 @@ function loadRouteSizes(sizesPath) {
 }
 
 module.exports = {
+  slugifyBranch,
   formatBytes,
   formatDiff,
   processStats,
