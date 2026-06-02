@@ -59,6 +59,21 @@ permissions:
 - **On push to any branch**: parses the stats file, computes gzip sizes for each route, and uploads the result as a GitHub Actions artifact (per branch).
 - **On pull request**: downloads the baseline artifact from the PR's target branch, parses the current stats file, calculates gzip sizes, and posts (or updates) a sticky comment with a route-by-route comparison table.
 
+### Comparing against branches other than your default
+
+A PR is compared against a baseline stored for its **target branch**, so that branch needs a baseline — which means your workflow must run on pushes to it. The examples trigger on pushes to `main`, which covers the common case of PRs into `main`. To also compare PRs that target another long-lived branch (e.g. `develop`), add it to the push triggers:
+
+```yaml
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+```
+
+If no baseline exists for the target branch, the action falls back to the default branch's baseline (and, for repos upgrading from an older version, the previous unsuffixed artifact name).
+
+> **Notes:** Branch names are slugified into the artifact name (any character outside `A-Za-z0-9._-`, such as `/`, becomes `-`), so two branches differing only by such characters (e.g. `feat/a` and `feat-a`) would share a baseline. Each branch's baseline is kept under GitHub's default artifact retention (90 days); deleted branches leave an orphaned artifact until it expires.
+
 Chunk files and the app-paths manifest are resolved relative to the `.next` directory inferred from `stats-path`, so pointing it to a subdirectory (e.g. `apps/my-app/.next/diagnostics/route-bundle-stats.json`) works correctly without any additional configuration. See [`examples/monorepo.yml`](examples/monorepo.yml) for a complete monorepo setup.
 
 ### Working directory in monorepos

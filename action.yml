@@ -34,9 +34,30 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Resolve baseline artifact name
+      id: baseline-artifact
+      if: github.event_name == 'push' || github.event_name == 'pull_request'
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        ACTION_PATH: ${{ github.action_path }}
+        # On a PR compare against the target branch; on a push baseline the pushed branch.
+        REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref || github.ref_name }}
+      with:
+        # Branch names contain characters (e.g. "/") that artifact names forbid,
+        # so the ref is slugified. Upload and download both use this output so
+        # the names always match.
+        script: |
+          const path = require('path');
+          const { slugifyBranch } = require(
+            path.join(process.env.ACTION_PATH, 'src', 'parse-stats.js')
+          );
+          core.setOutput('name', `${process.env.ARTIFACT_NAME}-${slugifyBranch(process.env.REF)}`);
+
     - name: Compute baseline route sizes
       if: github.event_name == 'push'
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      continue-on-error: true
       env:
         STATS_PATH: ${{ inputs.stats-path }}
         ACTION_PATH: ${{ github.action_path }}
@@ -51,8 +72,9 @@ runs:
     - name: Upload baseline stats
       if: github.event_name == 'push'
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      continue-on-error: true
       with:
-        name: ${{ inputs.artifact-name }}-${{ github.ref_name }}
+        name: ${{ steps.baseline-artifact.outputs.name }}
         path: bundle-route-sizes.json
         overwrite: true
 
@@ -64,7 +86,7 @@ runs:
       with:
         github_token: ${{ inputs.github-token }}
         branch: ${{ github.event.pull_request.base.ref }}
-        name: ${{ inputs.artifact-name }}-${{ github.event.pull_request.base.ref }}
+        name: ${{ steps.baseline-artifact.outputs.name }}
         path: _bundle-baseline-stats
 
     - name: Download baseline stats (legacy fallback)

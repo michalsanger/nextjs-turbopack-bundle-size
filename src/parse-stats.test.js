@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
 const {
+  slugifyBranch,
   formatBytes,
   formatDiff,
   processStats,
@@ -13,6 +14,36 @@ const {
   generateReport,
   parseStatsFile,
 } = require("./parse-stats.js");
+
+// ---------------------------------------------------------------------------
+// slugifyBranch
+// ---------------------------------------------------------------------------
+
+describe("slugifyBranch", () => {
+  test("leaves a plain branch name unchanged", () => {
+    assert.equal(slugifyBranch("main"), "main");
+  });
+
+  test("replaces a slash with a dash", () => {
+    assert.equal(slugifyBranch("feat/x"), "feat-x");
+  });
+
+  test("replaces every slash in a nested ref", () => {
+    assert.equal(slugifyBranch("dependabot/npm_and_yarn/foo"), "dependabot-npm_and_yarn-foo");
+  });
+
+  test("preserves dots, underscores and dashes", () => {
+    assert.equal(slugifyBranch("release/1.0_rc-2"), "release-1.0_rc-2");
+  });
+
+  test("replaces all artifact-forbidden characters", () => {
+    assert.equal(slugifyBranch('a:b*c?d"e<f>g|h\\i/j'), "a-b-c-d-e-f-g-h-i-j");
+  });
+
+  test("is idempotent on already-clean names", () => {
+    assert.equal(slugifyBranch(slugifyBranch("feat/x")), "feat-x");
+  });
+});
 
 // ---------------------------------------------------------------------------
 // formatBytes
