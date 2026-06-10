@@ -58,6 +58,7 @@ Exported functions:
 - `generateReport(currentRoutes, baselineRoutes, threshold?, budgetPercentIncreaseRed?, appName?)` — pure function; builds the markdown table string.
 - `formatBytes(bytes)` / `formatDiff(current, baseline, threshold?, budgetPercentIncreaseRed?)` — pure formatting helpers.
 - `saveRouteSizes(statsPath, outputPath)` / `loadRouteSizes(sizesPath)` — I/O helpers; the push phase computes and writes the baseline with `saveRouteSizes`, and the PR phase reads a precomputed baseline with `loadRouteSizes`.
+- `loadBaselineRoutes(baselineDir)` — I/O helper used by the PR phase; picks the baseline from the downloaded artifact directory (precomputed `bundle-route-sizes.json` → legacy `webpack-stats.json` parsed without gzip → `{}`).
 
 The `processStats`/`processNewStats`/`parseStatsFile` split keeps I/O at the boundary and makes the core logic testable without touching the filesystem.
 
