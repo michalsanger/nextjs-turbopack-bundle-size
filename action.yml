@@ -118,24 +118,14 @@ runs:
         script: |
           const path = require('path');
           const fs = require('fs');
-          const { parseStatsFile, loadRouteSizes, generateReport } = require(
+          const { parseStatsFile, loadBaselineRoutes, generateReport } = require(
             path.join(process.env.ACTION_PATH, 'src', 'parse-stats.js')
           );
 
           const threshold = parseInt(process.env.MINIMUM_CHANGE_THRESHOLD) || 0;
           const budgetPercentIncreaseRed = parseInt(process.env.BUDGET_PERCENT_INCREASE_RED) || 0;
           const currentRoutes = parseStatsFile(process.env.STATS_PATH, true);
-
-          const precomputedPath = path.join('_bundle-baseline-stats', 'bundle-route-sizes.json');
-          const legacyFallbackPath = path.join('_bundle-baseline-stats', 'webpack-stats.json');
-          let baselineRoutes;
-          if (fs.existsSync(precomputedPath)) {
-            baselineRoutes = loadRouteSizes(precomputedPath);
-          } else if (fs.existsSync(legacyFallbackPath)) {
-            baselineRoutes = parseStatsFile(legacyFallbackPath, false);
-          } else {
-            baselineRoutes = {};
-          }
+          const baselineRoutes = loadBaselineRoutes('_bundle-baseline-stats');
 
           const appName = process.env.APP_NAME || '';
           fs.writeFileSync('bundle-report.md', generateReport(currentRoutes, baselineRoutes, threshold, budgetPercentIncreaseRed, appName));
@@ -144,5 +134,6 @@ runs:
       if: github.event_name == 'pull_request'
       uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
       with:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
         header: ${{ inputs.app-name != '' && format('bundle-size-report-{0}', inputs.app-name) || 'bundle-size-report' }}
         path: bundle-report.md
