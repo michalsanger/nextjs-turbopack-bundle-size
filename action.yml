@@ -85,7 +85,7 @@ runs:
     - name: Download baseline stats
       id: download-baseline
       if: github.event_name == 'pull_request'
-      uses: dawidd6/action-download-artifact@b6e2e70617bc3265edd6dab6c906732b2f1ae151 # v21
+      uses: dawidd6/action-download-artifact@d63b86af1b34672e53c440b1b83979861906bad7 # v24
       continue-on-error: true
       with:
         github_token: ${{ inputs.github-token }}
@@ -96,7 +96,7 @@ runs:
 
     - name: Download baseline stats (legacy fallback)
       if: github.event_name == 'pull_request' && steps.download-baseline.outcome == 'failure'
-      uses: dawidd6/action-download-artifact@b6e2e70617bc3265edd6dab6c906732b2f1ae151 # v21
+      uses: dawidd6/action-download-artifact@d63b86af1b34672e53c440b1b83979861906bad7 # v24
       continue-on-error: true
       with:
         github_token: ${{ inputs.github-token }}
