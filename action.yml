@@ -85,7 +85,7 @@ runs:
     - name: Download baseline stats
       id: download-baseline
       if: github.event_name == 'pull_request'
-      uses: dawidd6/action-download-artifact@b6e2e70617bc3265edd6dab6c906732b2f1ae151 # v21
+      uses: dawidd6/action-download-artifact@d63b86af1b34672e53c440b1b83979861906bad7 # v24
       continue-on-error: true
       with:
         github_token: ${{ inputs.github-token }}
@@ -93,17 +93,27 @@ runs:
         branch: ${{ github.event.pull_request.base.ref }}
         name: ${{ steps.baseline-artifact.outputs.name }}
         path: _bundle-baseline-stats
+        # GitHub's `listWorkflowRuns?branch=...` index is eventually consistent and
+        # can hand back a stale "newest" run (observed returning a run from months
+        # ago while today's run existed). `search_artifacts: true` makes dawidd6
+        # list each run's artifacts and skip runs that don't contain the named
+        # artifact, walking back until it finds one that does — instead of blindly
+        # trusting the newest run and failing when the artifact isn't in it.
+        search_artifacts: true
+        workflow_conclusion: success
 
     - name: Download baseline stats (legacy fallback)
       if: github.event_name == 'pull_request' && steps.download-baseline.outcome == 'failure'
-      uses: dawidd6/action-download-artifact@b6e2e70617bc3265edd6dab6c906732b2f1ae151 # v21
+      uses: dawidd6/action-download-artifact@d63b86af1b34672e53c440b1b83979861906bad7 # v24
       continue-on-error: true
       with:
         github_token: ${{ inputs.github-token }}
         workflow: ${{ inputs.baseline-workflow }}
         branch: ${{ github.event.repository.default_branch }}
-        name: ${{ inputs.artifact-name }}
+        name: ${{ steps.baseline-artifact.outputs.name }}
         path: _bundle-baseline-stats
+        search_artifacts: true
+        workflow_conclusion: success
 
     - name: Calculate bundle sizes and diff
       if: github.event_name == 'pull_request'
