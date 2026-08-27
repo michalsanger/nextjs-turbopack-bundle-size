@@ -36,8 +36,8 @@ The action runs two distinct phases based on GitHub context, both within a singl
 
 **On pull request** (`if: github.event_name == 'pull_request'`):
 
-1. Downloads the baseline artifact from the PR's **target branch** (`github.event.pull_request.base.ref`, branch-scoped name) via `dawidd6/action-download-artifact` (uses this community action because the standard `actions/download-artifact` cannot cross branches; `continue-on-error: true` handles the first-ever PR gracefully)
-2. If that download fails (`steps.download-baseline.outcome == 'failure'`), a **legacy-fallback** step retries against the default branch with the unsuffixed artifact name — preserving baselines for repos upgrading from the pre-branch-scoped layout
+1. **Resolve baseline run** (`actions/github-script`): resolves the tip SHA of the PR's **target branch** (`repos.getBranch` on `github.event.pull_request.base.ref`), lists runs for that exact SHA (`actions.listWorkflowRunsForRepo` with `head_sha` — indexed by SHA, unlike the eventually-consistent `branch=` listing that used to hand back weeks-old runs), keeps successful runs of the baseline workflow (matched by file path: the current workflow from `GITHUB_WORKFLOW_REF`, or `baseline-workflow` if set), and picks the first one whose artifacts include the branch-scoped name. If the tip has no artifact yet (PR opened before the base push finished building), it walks back through up to 25 ancestor commits (`repos.listCommits`). Outputs `run-id`, empty when nothing was found. `continue-on-error: true` so an API failure degrades to "no baseline" instead of failing the caller's job
+2. **Download baseline stats** via the official `actions/download-artifact` using `run-id` + `github-token` (cross-run download); skipped when `run-id` is empty, `continue-on-error: true`
 3. Runs inline JavaScript via `actions/github-script` to parse both stat files, calculate gzip sizes, compute diffs
 4. Posts/updates a sticky PR comment via `marocchino/sticky-pull-request-comment`
 
@@ -65,11 +65,12 @@ The baseline stats are downloaded to `_bundle-baseline-stats/` in the workspace.
 
 ## Inputs
 
-| Input                         | Default                                     | Purpose                                                         |
-| ----------------------------- | ------------------------------------------- | --------------------------------------------------------------- |
-| `github-token`                | required                                    | Artifact download + PR comment                                  |
-| `stats-path`                  | `.next/diagnostics/route-bundle-stats.json` | Override if build output differs; auto-detects legacy path      |
-| `artifact-name`               | `turbopack-main-stats`                      | Prefix for baseline artifacts; the branch name is appended      |
-| `minimum-change-threshold`    | `0`                                         | Byte threshold below which a change shows "➖ No change"        |
-| `budget-percent-increase-red` | `0`                                         | % threshold; increases above show 🔴, below show 🟡             |
-| `app-name`                    | `""`                                        | Report header + unique sticky-comment key (for matrix/monorepo) |
+| Input                         | Default                                     | Purpose                                                                    |
+| ----------------------------- | ------------------------------------------- | -------------------------------------------------------------------------- |
+| `github-token`                | required                                    | Artifact download + PR comment                                             |
+| `stats-path`                  | `.next/diagnostics/route-bundle-stats.json` | Override if build output differs; auto-detects legacy path                 |
+| `artifact-name`               | `turbopack-main-stats`                      | Prefix for baseline artifacts; the branch name is appended                 |
+| `minimum-change-threshold`    | `0`                                         | Byte threshold below which a change shows "➖ No change"                   |
+| `budget-percent-increase-red` | `0`                                         | % threshold; increases above show 🔴, below show 🟡                        |
+| `app-name`                    | `""`                                        | Report header + unique sticky-comment key (for matrix/monorepo)            |
+| `baseline-workflow`           | `""`                                        | Workflow file (e.g. `main.yml`) that uploads the baseline, if not this one |

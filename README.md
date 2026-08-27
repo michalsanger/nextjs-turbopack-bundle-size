@@ -71,7 +71,7 @@ on:
   pull_request:
 ```
 
-If no baseline exists for the target branch, the action falls back to the default branch's baseline (and, for repos upgrading from an older version, the previous unsuffixed artifact name).
+The baseline comes from the newest successful run of the workflow on the target branch that uploaded one. The lookup starts at the branch tip and walks back up to 25 commits, so a PR opened before the latest push has finished building still compares against the previous baseline. If none of those commits has a baseline, all routes show as "🆕 New".
 
 > **Notes:** Branch names are slugified into the artifact name (any character outside `A-Za-z0-9._-`, such as `/`, becomes `-`), so two branches differing only by such characters (e.g. `feat/a` and `feat-a`) would share a baseline. Each branch's baseline is kept under GitHub's default artifact retention (90 days); deleted branches leave an orphaned artifact until it expires.
 
