@@ -41,9 +41,7 @@ function formatDiff(current, baseline, threshold = 0, budgetPercentIncreaseRed =
   if (baseline === undefined) return "🆕 New";
   const diff = current - baseline;
   if (Math.abs(diff) <= threshold) return "➖ No change";
-  if (baseline === 0) {
-    return diff > 0 ? `🔴 \`+${formatBytes(diff)}\`` : `🟢 \`-${formatBytes(Math.abs(diff))}\``;
-  }
+  // When baseline is 0 the percent is Infinity, which always exceeds the budget → 🔴.
   const percent = (Math.abs(diff) / baseline) * 100;
   if (diff > 0) {
     const icon = percent > budgetPercentIncreaseRed ? "🔴" : "🟡";
@@ -266,18 +264,24 @@ function parseStatsFile(statsPath, calculateGzip) {
 
   const dotNextDir = findDotNextDir(resolvedPath);
 
+  // The same chunk can appear in many routes; cache so each file is gzipped once.
+  const gzipCache = new Map();
   const getGzipSize = calculateGzip
     ? (assetName) => {
+        if (gzipCache.has(assetName)) return gzipCache.get(assetName);
         const relativeFromDotNext =
           assetName.startsWith(".next/") || assetName.startsWith(".next" + path.sep)
             ? assetName.slice(".next".length + 1)
             : assetName;
         const filePath = path.join(dotNextDir, relativeFromDotNext);
+        let size = 0;
         if (fs.existsSync(filePath)) {
-          return zlib.gzipSync(fs.readFileSync(filePath)).length;
+          size = zlib.gzipSync(fs.readFileSync(filePath)).length;
+        } else {
+          console.log(`⚠️ Warning: Could not find file on disk for gzip: ${filePath}`);
         }
-        console.log(`⚠️ Warning: Could not find file on disk for gzip: ${filePath}`);
-        return 0;
+        gzipCache.set(assetName, size);
+        return size;
       }
     : null;
 
@@ -324,7 +328,6 @@ function generateReport(
   }
 
   const currentGlobal = (currentRoutes["global"] || {}).gzip || 0;
-  const baselineGlobal = (baselineRoutes["global"] || {}).gzip || 0;
 
   const changedRows = [];
   for (const route of allRoutes) {
@@ -366,9 +369,7 @@ function generateReport(
  * @param {string} outputPath - Path to write the computed route sizes
  */
 function saveRouteSizes(statsPath, outputPath) {
-  const resolvedPath = resolveStatsPath(statsPath);
-  const routes = parseStatsFile(resolvedPath, true);
-  fs.writeFileSync(outputPath, JSON.stringify(routes));
+  fs.writeFileSync(outputPath, JSON.stringify(parseStatsFile(statsPath, true)));
 }
 
 /**
@@ -380,6 +381,24 @@ function saveRouteSizes(statsPath, outputPath) {
 function loadRouteSizes(sizesPath) {
   if (!fs.existsSync(sizesPath)) return {};
   return JSON.parse(fs.readFileSync(sizesPath, "utf8"));
+}
+
+/**
+ * Loads the baseline routes from a downloaded baseline artifact directory.
+ *
+ * Prefers the precomputed sizes file uploaded by the push phase; falls back to
+ * a raw legacy webpack-stats.json (pre-branch-scoped artifact layout). Returns
+ * an empty object when no baseline was downloaded (e.g. the first-ever PR).
+ *
+ * @param {string} baselineDir - Directory the baseline artifact was downloaded to
+ * @returns {Record<string, { gzip: number }>}
+ */
+function loadBaselineRoutes(baselineDir) {
+  const precomputedPath = path.join(baselineDir, "bundle-route-sizes.json");
+  if (fs.existsSync(precomputedPath)) return loadRouteSizes(precomputedPath);
+  const legacyFallbackPath = path.join(baselineDir, "webpack-stats.json");
+  if (fs.existsSync(legacyFallbackPath)) return parseStatsFile(legacyFallbackPath, false);
+  return {};
 }
 
 module.exports = {
@@ -394,4 +413,5 @@ module.exports = {
   generateReport,
   saveRouteSizes,
   loadRouteSizes,
+  loadBaselineRoutes,
 };

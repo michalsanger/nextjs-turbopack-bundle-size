@@ -1,4 +1,5 @@
 {
+  "private": true,
   "scripts": {
     "test": "node --test src/parse-stats.test.js",
     "format": "prettier --write .",

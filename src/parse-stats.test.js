@@ -13,6 +13,7 @@ const {
   buildRouteGroupMap,
   generateReport,
   parseStatsFile,
+  loadBaselineRoutes,
 } = require("./parse-stats.js");
 
 // ---------------------------------------------------------------------------
@@ -613,6 +614,10 @@ describe("parseStatsFile", () => {
 describe("buildRouteGroupMap", () => {
   const tmpDir = path.join(process.env.TMPDIR || "/tmp", "parse-stats-test");
 
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
   test("returns empty object when manifest does not exist", () => {
     assert.deepEqual(buildRouteGroupMap("/nonexistent/path.json"), {});
   });
@@ -634,7 +639,6 @@ describe("buildRouteGroupMap", () => {
     assert.equal(map["/book-session/[hash]"], "/(frontend)/book-session/[hash]");
     assert.ok(!("/about" in map), "routes without groups should not appear");
     assert.ok(!("/api/admin/auth" in map), "API routes should not appear");
-    fs.rmSync(tmpDir, { recursive: true });
   });
 
   test("handles nested route groups", () => {
@@ -648,7 +652,6 @@ describe("buildRouteGroupMap", () => {
     );
     const map = buildRouteGroupMap(manifestPath);
     assert.equal(map["/pricing"], "/(marketing)/(landing)/pricing");
-    fs.rmSync(tmpDir, { recursive: true });
   });
 
   test("maps root route group to /", () => {
@@ -662,7 +665,60 @@ describe("buildRouteGroupMap", () => {
     );
     const map = buildRouteGroupMap(manifestPath);
     assert.equal(map["/"], "/(frontend)");
-    fs.rmSync(tmpDir, { recursive: true });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// loadBaselineRoutes
+// ---------------------------------------------------------------------------
+
+describe("loadBaselineRoutes", () => {
+  const baselineDir = path.join(
+    process.env.TMPDIR || "/tmp",
+    `load-baseline-routes-${process.pid}`,
+  );
+
+  afterEach(() => {
+    fs.rmSync(baselineDir, { recursive: true, force: true });
+  });
+
+  test("returns empty object when the baseline directory does not exist", () => {
+    assert.deepEqual(loadBaselineRoutes(baselineDir), {});
+  });
+
+  test("loads precomputed route sizes when present", () => {
+    fs.mkdirSync(baselineDir, { recursive: true });
+    const sizes = { global: { gzip: 5000 }, "/": { gzip: 1024 } };
+    fs.writeFileSync(path.join(baselineDir, "bundle-route-sizes.json"), JSON.stringify(sizes));
+    assert.deepEqual(loadBaselineRoutes(baselineDir), sizes);
+  });
+
+  test("prefers precomputed sizes over a legacy stats file", () => {
+    fs.mkdirSync(baselineDir, { recursive: true });
+    const sizes = { "/": { gzip: 1024 } };
+    fs.writeFileSync(path.join(baselineDir, "bundle-route-sizes.json"), JSON.stringify(sizes));
+    fs.writeFileSync(
+      path.join(baselineDir, "webpack-stats.json"),
+      JSON.stringify({
+        assets: [{ name: "other.js", size: 100 }],
+        namedChunkGroups: { "app/other/page": { assets: [{ name: "other.js" }] } },
+      }),
+    );
+    assert.deepEqual(loadBaselineRoutes(baselineDir), sizes);
+  });
+
+  test("falls back to parsing a legacy webpack-stats.json without gzip", () => {
+    fs.mkdirSync(baselineDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(baselineDir, "webpack-stats.json"),
+      JSON.stringify({
+        assets: [{ name: "about.js", size: 2048 }],
+        namedChunkGroups: { "app/about/page": { assets: [{ name: "about.js" }] } },
+      }),
+    );
+    const routes = loadBaselineRoutes(baselineDir);
+    assert.ok("/about" in routes, "expected /about route from legacy stats");
+    assert.equal(routes["/about"].gzip, 0, "legacy fallback should not compute gzip");
   });
 });
 
