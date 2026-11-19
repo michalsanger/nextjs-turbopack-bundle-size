@@ -44,6 +44,7 @@ The action posts a comment like this on every pull request:
 | `minimum-change-threshold`    | No       | `0`                                         | Byte threshold below which a size change is considered unchanged. For example, `500` means changes of 500 B or less are shown as "➖ No change".                                                                                                                                                                           |
 | `budget-percent-increase-red` | No       | `0`                                         | Percentage threshold for flagging size increases as critical. Increases above this percentage show 🔴, others show 🟡. Default `0` means all increases show 🔴. For example, `20` means only increases above 20% are flagged red.                                                                                          |
 | `app-name`                    | No       | —                                           | Application name in the report header (e.g. `My App` → "📦 My App — App Router Sizes (Turbopack)"). When set, the sticky PR comment uses `bundle-size-report-{name}` so matrix jobs for multiple apps do not overwrite each other. If not set, a generic header and the default comment key `bundle-size-report` are used. |
+| `baseline-wait-timeout`       | No       | `300`                                       | Seconds to wait for the baseline run of the PR's exact base commit if it is still in progress, before falling back to an older commit. `0` disables waiting.                                                                                                                                                               |
 | `baseline-workflow`           | No       | —                                           | Workflow file name (e.g. `main.yml`) to look up the baseline artifact in. Set this when the baseline artifact is uploaded by a different workflow than the one running this action. When unset, the artifact is searched in the current workflow.                                                                          |
 
 ## Required Permissions
@@ -71,7 +72,14 @@ on:
   pull_request:
 ```
 
-The baseline comes from the newest successful run of the workflow on the target branch that uploaded one. The lookup starts at the branch tip and walks back up to 25 commits, so a PR opened before the latest push has finished building still compares against the previous baseline. If none of those commits has a baseline, all routes show as "🆕 New".
+### Which commit is the baseline
+
+The diff should show only what your PR changes, so the baseline is the exact commit your build sits on top of — not the current tip of the target branch, which may have moved on since:
+
+- **Default checkout** (`actions/checkout` builds GitHub's merge commit on `pull_request`): the baseline is the merge commit's first parent, i.e. the target branch as it was when the merge was computed. The diff includes interactions between your PR and the latest target branch.
+- **Checking out the PR head** (`ref: ${{ github.event.pull_request.head.sha }}`): the baseline is the merge base of your branch and the target branch, so commits that landed on the target branch later never count against your PR.
+
+If that commit's baseline run is still in progress (e.g. you pushed right after something was merged), the action waits for it, up to `baseline-wait-timeout` seconds. If the commit has no baseline at all (`[skip ci]`, path filters, a middle commit of a multi-commit push), it walks back up to 24 ancestors and the PR comment says which commit was used and that the diff may include changes from the commits in between. The comment always names the baseline commit. If no baseline is found, all routes show as "🆕 New".
 
 > **Notes:** Branch names are slugified into the artifact name (any character outside `A-Za-z0-9._-`, such as `/`, becomes `-`), so two branches differing only by such characters (e.g. `feat/a` and `feat-a`) would share a baseline. Each branch's baseline is kept under GitHub's default artifact retention (90 days); deleted branches leave an orphaned artifact until it expires.
 
