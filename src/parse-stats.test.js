@@ -12,6 +12,7 @@ const {
   processNewStats,
   buildRouteGroupMap,
   generateReport,
+  formatBaselineNote,
   parseStatsFile,
 } = require("./parse-stats.js");
 
@@ -923,5 +924,65 @@ describe("generateReport full table", () => {
         "|---|---|---|---|\n" +
         "| `/` | `512 B` | `512 B` | 🆕 New |\n",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatBaselineNote / generateReport baseline note
+// ---------------------------------------------------------------------------
+
+describe("formatBaselineNote", () => {
+  const B = "b".repeat(40);
+  const A = "a".repeat(40);
+  const url = "https://github.com/o/r/commit/";
+
+  test("names the exact baseline commit", () => {
+    assert.equal(
+      formatBaselineNote({ sha: B, targetSha: B, mode: "merge-commit", commitUrl: url }),
+      `Compared against [\`bbbbbbb\`](${url}${B}) (the base of this PR's merge commit).\n\n`,
+    );
+  });
+
+  test("warns when an older commit was used", () => {
+    assert.equal(
+      formatBaselineNote({ sha: A, targetSha: B, commitsBehind: 2, mode: "merge-base" }),
+      "> ⚠️ **Approximate baseline:** `bbbbbbb` (the merge base of this PR) has no baseline yet, " +
+        "so `aaaaaaa` (2 commits older) was used. " +
+        "The diff may include size changes from those commits.\n\n",
+    );
+  });
+
+  test("uses singular for one commit", () => {
+    assert.match(
+      formatBaselineNote({ sha: A, targetSha: B, commitsBehind: 1, mode: "merge-commit" }),
+      /\(1 commit older\).*those commit\./,
+    );
+  });
+
+  test("warns when no baseline was found", () => {
+    assert.equal(
+      formatBaselineNote({ sha: "", targetSha: B, mode: "branch-tip" }),
+      "> ⚠️ **No baseline found** for `bbbbbbb` (the tip of the target branch) or its recent " +
+        "ancestors, so every route is shown as new.\n\n",
+    );
+  });
+
+  test("generateReport inserts the note after the header", () => {
+    const report = generateReport({ "/": { gzip: 512 } }, { "/": { gzip: 512 } }, 0, 0, "", {
+      sha: B,
+      targetSha: B,
+      mode: "merge-commit",
+    });
+    assert.ok(
+      report.endsWith(
+        "🤖\n\nCompared against `bbbbbbb` (the base of this PR's merge commit).\n\n" +
+          "This PR introduced no changes to the JavaScript bundle! 🙌\n",
+      ),
+    );
+  });
+
+  test("generateReport omits the note without a target commit", () => {
+    const report = generateReport({}, {}, 0, 0, "", { sha: "", targetSha: "" });
+    assert.ok(!report.includes("baseline"));
   });
 });

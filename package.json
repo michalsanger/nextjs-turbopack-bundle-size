@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "test": "node --test src/parse-stats.test.js",
+    "test": "node --test src/parse-stats.test.js src/resolve-baseline.test.js",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

@@ -23,6 +23,8 @@ npm test   # run unit tests (no install needed — uses Node built-in test runne
 - `action.yml` — the action definition (root is required by GitHub)
 - `src/parse-stats.js` — all parsing, formatting, and report generation logic
 - `src/parse-stats.test.js` — unit tests for the above
+- `src/resolve-baseline.js` — baseline commit/run resolution for the PR phase (takes an Octokit instance)
+- `src/resolve-baseline.test.js` — unit tests with a fake Octokit
 - `examples/usage.yml` — a complete example workflow for consuming repos
 - `README.md` — usage docs including inputs and permissions
 
@@ -36,9 +38,9 @@ The action runs two distinct phases based on GitHub context, both within a singl
 
 **On pull request** (`if: github.event_name == 'pull_request'`):
 
-1. **Resolve baseline run** (`actions/github-script`): resolves the tip SHA of the PR's **target branch** (`repos.getBranch` on `github.event.pull_request.base.ref`), lists runs for that exact SHA (`actions.listWorkflowRunsForRepo` with `head_sha` — indexed by SHA, unlike the eventually-consistent `branch=` listing that used to hand back weeks-old runs), keeps successful runs of the baseline workflow (matched by file path: the current workflow from `GITHUB_WORKFLOW_REF`, or `baseline-workflow` if set), and picks the first one whose artifacts include the branch-scoped name. If the tip has no artifact yet (PR opened before the base push finished building), it walks back through up to 25 ancestor commits (`repos.listCommits`). Outputs `run-id`, empty when nothing was found. `continue-on-error: true` so an API failure degrades to "no baseline" instead of failing the caller's job
+1. **Resolve baseline run** (`actions/github-script`, logic in `src/resolve-baseline.js`): `resolveTargetSha` picks the exact commit the PR build sits on — the first parent of the merge commit (`GITHUB_SHA`) when the merge commit was checked out (the default), or the merge base (`compareCommitsWithBasehead`) when the caller checked out `pull_request.head.sha`; it falls back to the target-branch tip only if neither can be determined. `findBaselineRun` lists runs for that SHA (`listWorkflowRunsForRepo` with `head_sha`), keeps runs of the baseline workflow (matched by file path: the current workflow from `GITHUB_WORKFLOW_REF`, or `baseline-workflow` if set), and returns the first successful one with the branch-scoped artifact. If a run on that SHA is still in progress it polls (up to `baseline-wait-timeout`); otherwise it walks back through up to 24 ancestors (`repos.listCommits`). Outputs `run-id`, `baseline-sha`, `target-sha`, `commits-behind`, `mode`; `run-id` is empty when nothing was found. `continue-on-error: true` so an API failure degrades to "no baseline" instead of failing the caller's job
 2. **Download baseline stats** via the official `actions/download-artifact` using `run-id` + `github-token` (cross-run download); skipped when `run-id` is empty, `continue-on-error: true`
-3. Runs inline JavaScript via `actions/github-script` to parse both stat files, calculate gzip sizes, compute diffs
+3. Runs inline JavaScript via `actions/github-script` to parse both stat files, calculate gzip sizes, compute diffs; the report names the baseline commit and warns when an ancestor was used
 4. Posts/updates a sticky PR comment via `marocchino/sticky-pull-request-comment`
 
 The `if:` conditions on composite action steps use the **caller's** event context — `github.event_name` is `pull_request` / `push`, not `workflow_call`.
@@ -55,7 +57,7 @@ Exported functions:
 - `buildRouteGroupMap(manifestPath)` — pure function; reads `app-paths-manifest.json` and maps clean URL routes to their route-group-prefixed paths (e.g. `/about` → `/(frontend)/about`) for the new format.
 - `resolveStatsPath(statsPath)` — checks known stats file locations; falls back to `.next/diagnostics/route-bundle-stats.json` (new) or `.next/server/webpack-stats.json` (legacy).
 - `parseStatsFile(statsPath, calculateGzip)` — I/O wrapper; resolves the path, reads JSON from disk (returns `{}` on a missing or unparseable file), auto-detects format (array → new, object → legacy), delegates to the appropriate processor.
-- `generateReport(currentRoutes, baselineRoutes, threshold?, budgetPercentIncreaseRed?, appName?)` — pure function; builds the markdown table string.
+- `generateReport(currentRoutes, baselineRoutes, threshold?, budgetPercentIncreaseRed?, appName?, baselineInfo?)` — pure function; builds the markdown table string. `baselineInfo` (`{ sha, targetSha, commitsBehind, mode, commitUrl }`) adds a note from `formatBaselineNote` naming the baseline commit.
 - `formatBytes(bytes)` / `formatDiff(current, baseline, threshold?, budgetPercentIncreaseRed?)` — pure formatting helpers.
 - `saveRouteSizes(statsPath, outputPath)` / `loadRouteSizes(sizesPath)` — I/O helpers; the push phase computes and writes the baseline with `saveRouteSizes`, and the PR phase reads a precomputed baseline with `loadRouteSizes`.
 
@@ -73,4 +75,5 @@ The baseline stats are downloaded to `_bundle-baseline-stats/` in the workspace.
 | `minimum-change-threshold`    | `0`                                         | Byte threshold below which a change shows "➖ No change"                   |
 | `budget-percent-increase-red` | `0`                                         | % threshold; increases above show 🔴, below show 🟡                        |
 | `app-name`                    | `""`                                        | Report header + unique sticky-comment key (for matrix/monorepo)            |
+| `baseline-wait-timeout`       | `300`                                       | Seconds to wait for an in-progress baseline run on the exact base commit   |
 | `baseline-workflow`           | `""`                                        | Workflow file (e.g. `main.yml`) that uploads the baseline, if not this one |

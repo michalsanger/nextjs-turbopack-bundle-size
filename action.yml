@@ -30,6 +30,10 @@ inputs:
     description: "Application name to display in the report header. When set, the sticky PR comment uses a unique header (bundle-size-report-{name}) so matrix jobs do not overwrite each other. If not set, a generic report header and the default comment key are used."
     required: false
     default: ""
+  baseline-wait-timeout:
+    description: "Seconds to wait for the baseline workflow run of the PR's exact base commit if it is still in progress, before falling back to an older commit. 0 disables waiting."
+    required: false
+    default: "300"
   baseline-workflow:
     description: "Workflow file name (e.g. main.yml) to look up the baseline artifact in. Useful when the baseline is produced by a different workflow than the one running this action. When unset, the artifact is searched in the current workflow."
     required: false
@@ -91,16 +95,25 @@ runs:
       # skipped, and the report shows everything as 🆕.
       continue-on-error: true
       env:
+        ACTION_PATH: ${{ github.action_path }}
         ARTIFACT_NAME: ${{ steps.baseline-artifact.outputs.name }}
         BASE_REF: ${{ github.event.pull_request.base.ref }}
+        PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         BASELINE_WORKFLOW: ${{ inputs.baseline-workflow }}
+        BASELINE_WAIT_TIMEOUT: ${{ inputs.baseline-wait-timeout }}
       with:
         github-token: ${{ inputs.github-token }}
         script: |
-          const target = process.env.ARTIFACT_NAME;
-          const baseRef = process.env.BASE_REF;
+          const path = require('path');
+          const { execFileSync } = require('child_process');
+          const { resolveTargetSha, findBaselineRun, MAX_COMMITS } = require(
+            path.join(process.env.ACTION_PATH, 'src', 'resolve-baseline.js')
+          );
           const owner = context.repo.owner;
           const repo = context.repo.repo;
+          const baseRef = process.env.BASE_REF;
+          const artifactName = process.env.ARTIFACT_NAME;
+
           // Runs are matched to the baseline workflow by file path rather than
           // display name, so two workflows sharing a `name:` stay apart and
           // `baseline-workflow` can point at a different file. The current
@@ -112,83 +125,63 @@ runs:
           const workflowPath = process.env.BASELINE_WORKFLOW
             ? `.github/workflows/${process.env.BASELINE_WORKFLOW}`
             : ownWorkflowPath;
-          const workflowLabel = workflowPath || context.workflow;
           const matchesWorkflow = workflowPath
             ? (r) => r.path === workflowPath
             : (r) => r.name === context.workflow;
-          core.info(`Resolving baseline artifact "${target}" from branch "${baseRef}" (workflow ${workflowLabel})`);
-          // GitHub's run-listing endpoints are all eventually consistent and
-          // unreliable for finding the newest run of a specific workflow+branch:
-          //   - listWorkflowRuns?branch=... handed back a run from weeks ago
-          //     while today's run existed (the original bug).
-          //   - listWorkflowRunsForRepo walks newest-first, but on an active repo
-          //     this workflow's recent runs are buried past the first pages and an
-          //     older run (still unexpired) surfaced first.
-          //   - listArtifacts (repo-wide) only returns the current run's artifacts
-          //     under the pull_request GITHUB_TOKEN.
-          //
-          // Deterministic approach: resolve the base branch's TIP commit SHA
-          // (getBranch), then list runs for that exact SHA filtered to the
-          // baseline workflow. head_sha is indexed deterministically, so the
-          // current baseline run is found regardless of ordering lag.
-          // If the tip's run has no artifact yet (race: PR opened
-          // before the base push's workflow finished), walk base history SHAs via
-          // listCommits until one with a matching artifact is found.
-          const branch = await octokit.rest.repos.getBranch({ owner, repo, branch: baseRef });
-          const tipSha = branch.data.commit.sha;
-          core.info(`base branch "${baseRef}" tip: ${tipSha.slice(0, 8)}`);
 
-          const findArtifactInRun = async (runId) => {
-            const res = await octokit.rest.actions.listWorkflowRunArtifacts({
-              owner, repo, run_id: runId,
-            });
-            return (res.data.artifacts || []).filter((a) => a.name === target && !a.expired);
-          };
-
-          // Candidate SHAs: the tip, then ancestors via listCommits (newest-first).
-          let found;
-          const commits = await octokit.rest.repos.listCommits({
-            owner, repo, sha: tipSha, per_page: 25,
-          });
-          for (const c of commits.data) {
-            const sha = c.sha;
-            // listWorkflowRunsForRepo supports head_sha — deterministic.
-            const runsRes = await octokit.rest.actions.listWorkflowRunsForRepo({
-              owner, repo, head_sha: sha, per_page: 100,
-            });
-            const runs = (runsRes.data.workflow_runs || [])
-              .filter((r) => matchesWorkflow(r) && r.conclusion === 'success')
-              .sort((a, b) => b.created_at.localeCompare(a.created_at));
-            if (runs.length === 0) {
-              core.info(`commit ${sha.slice(0, 8)}: no successful ${workflowLabel} run`);
-              continue;
-            }
-            for (const run of runs) {
-              try {
-                const items = await findArtifactInRun(run.id);
-                if (items.length > 0) {
-                  found = { run, artifact: items[0], sha };
-                  break;
-                }
-                core.info(`run ${run.id} (${sha.slice(0, 8)} ${run.created_at}): no "${target}"`);
-              } catch (err) {
-                core.info(`run ${run.id} (${sha.slice(0, 8)}): artifact listing failed — ${err.message}`);
-              }
-            }
-            if (found) break;
+          // What was actually built decides the baseline: the merge commit
+          // (checkout default) or the PR head (`ref: pull_request.head.sha`).
+          let builtSha = null;
+          try {
+            builtSha = execFileSync('git', ['rev-parse', 'HEAD'], {
+              cwd: process.env.GITHUB_WORKSPACE,
+              encoding: 'utf8',
+              stdio: ['ignore', 'pipe', 'ignore'],
+            }).trim();
+          } catch {
+            core.info('could not read the checked-out HEAD; assuming the merge commit');
           }
+
+          const target = await resolveTargetSha({
+            octokit, owner, repo, baseRef,
+            mergeSha: process.env.GITHUB_SHA,
+            prHeadSha: process.env.PR_HEAD_SHA,
+            builtSha,
+            log: core.info,
+          });
+          core.info(
+            `Resolving baseline artifact "${artifactName}" for ${target.sha.slice(0, 8)} ` +
+            `(${target.mode}, workflow ${workflowPath || context.workflow})`,
+          );
+          core.setOutput('target-sha', target.sha);
+          core.setOutput('mode', target.mode);
+
+          const found = await findBaselineRun({
+            octokit, owner, repo,
+            targetSha: target.sha,
+            artifactName,
+            matchesWorkflow,
+            currentRunId: context.runId,
+            waitTimeoutMs: (parseInt(process.env.BASELINE_WAIT_TIMEOUT) || 0) * 1000,
+            log: core.info,
+          });
           if (!found) {
             core.warning(
-              `No baseline artifact "${target}" found on the last 25 commits of ` +
-              `"${baseRef}". Diff will show everything as new.`,
+              `No baseline artifact "${artifactName}" found on ${target.sha.slice(0, 8)} or its ` +
+              `last ${MAX_COMMITS - 1} ancestors. Diff will show everything as new.`,
             );
             return;
           }
-          core.info(
-            `Found artifact ${found.artifact.id} from run ${found.run.id} ` +
-            `(commit ${found.sha.slice(0, 8)} ${found.run.created_at})`,
-          );
-          core.setOutput('run-id', String(found.run.id));
+          if (found.commitsBehind > 0) {
+            core.warning(
+              `Baseline for ${target.sha.slice(0, 8)} not available; using ${found.sha.slice(0, 8)} ` +
+              `(${found.commitsBehind} commit(s) older). The diff may include their changes.`,
+            );
+          }
+          core.info(`Using baseline from run ${found.runId} (commit ${found.sha.slice(0, 8)})`);
+          core.setOutput('run-id', String(found.runId));
+          core.setOutput('baseline-sha', found.sha);
+          core.setOutput('commits-behind', String(found.commitsBehind));
 
     - name: Download baseline stats
       id: download-baseline
@@ -217,6 +210,10 @@ runs:
         MINIMUM_CHANGE_THRESHOLD: ${{ inputs.minimum-change-threshold }}
         BUDGET_PERCENT_INCREASE_RED: ${{ inputs.budget-percent-increase-red }}
         APP_NAME: ${{ inputs.app-name }}
+        BASELINE_SHA: ${{ steps.download-baseline.outcome == 'success' && steps.baseline-run.outputs.baseline-sha || '' }}
+        BASELINE_TARGET_SHA: ${{ steps.baseline-run.outputs.target-sha }}
+        BASELINE_COMMITS_BEHIND: ${{ steps.baseline-run.outputs.commits-behind }}
+        BASELINE_MODE: ${{ steps.baseline-run.outputs.mode }}
       with:
         script: |
           const path = require('path');
@@ -241,7 +238,14 @@ runs:
           }
 
           const appName = process.env.APP_NAME || '';
-          fs.writeFileSync('bundle-report.md', generateReport(currentRoutes, baselineRoutes, threshold, budgetPercentIncreaseRed, appName));
+          const baselineInfo = {
+            sha: process.env.BASELINE_SHA,
+            targetSha: process.env.BASELINE_TARGET_SHA,
+            commitsBehind: parseInt(process.env.BASELINE_COMMITS_BEHIND) || 0,
+            mode: process.env.BASELINE_MODE,
+            commitUrl: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/commit/`,
+          };
+          fs.writeFileSync('bundle-report.md', generateReport(currentRoutes, baselineRoutes, threshold, budgetPercentIncreaseRed, appName, baselineInfo));
 
     - name: Post or update PR comment
       if: github.event_name == 'pull_request'
